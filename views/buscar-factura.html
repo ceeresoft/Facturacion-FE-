@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Facturación Electrónica</title>
+  <link rel="stylesheet" href="../lib/bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../assets/css/app.css">
+</head>
+<body data-require-auth class="app-page">
+
+  <header class="app-header">
+    <div class="container">
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div class="header-brand">
+          <img src="../assets/img/logo-ceere-software.png" alt="Ceere Software" class="header-logo-icon">
+          <nav class="header-nav" id="menuEnvio" aria-label="Tipo de envío">
+            <button type="button" class="header-nav-btn active" data-tipo-envio="factura">Envío de factura</button>
+            <button type="button" class="header-nav-btn" data-tipo-envio="nota_credito">Envío de nota crédito</button>
+          </nav>
+          <div>
+            <h1 class="company-name" data-empresa-nombre>Mi Empresa S.A.S.</h1>
+            <p class="app-subtitle">Sistema de Facturación Electrónica</p>
+          </div>
+        </div>
+        <div class="header-actions">
+          <div class="header-user-menu">
+            <a href="perfil-empresa.html" class="header-action-btn">Perfil empresa</a>
+            <button type="button" class="header-action-btn header-action-btn-outline" id="btnCerrarSesion">Cerrar sesión</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <div class="container">
+
+      <div class="search-card">
+        <h2 class="section-title" id="searchTitle">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+          </svg>
+          <span id="searchTitleText">Consultar factura</span>
+        </h2>
+
+        <form id="buscarForm" novalidate>
+          <div class="row g-3 align-items-end">
+            <div class="col-12 col-md-4 field-nota-credito">
+              <div class="search-field-group">
+                <label for="numeroNotaCredito" class="form-label">Número de nota crédito</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="numeroNotaCredito"
+                  name="numeroNotaCredito"
+                  placeholder="Ej: NC-000001"
+                >
+              </div>
+            </div>
+            <div class="col-12 col-md-4">
+              <div class="search-field-group">
+                <label for="resolucion" class="form-label">Resolución de facturación</label>
+                <select class="form-select" id="resolucion" name="resolucion">
+                  <option value="" selected disabled>Seleccione una resolución</option>
+                  <option value="res-001">Resolución 18764000001234 — Prefijo FE — Vigencia 2024-2026</option>
+                  <option value="res-002">Resolución 18764000005678 — Prefijo NC — Vigencia 2025-2027</option>
+                  <option value="res-003">Resolución 18764000009876 — Prefijo ND — Vigencia 2024-2025</option>
+                  <option value="res-004">Resolución 18764000004321 — Prefijo FE — Vigencia 2026-2028</option>
+                </select>
+              </div>
+            </div>
+            <div class="col-12 col-md-4">
+              <div class="search-field-group">
+                <label for="numeroFactura" class="form-label">Número de factura</label>
+                <select class="form-select" id="numeroFactura" name="numeroFactura">
+                  <option value="" selected disabled>Seleccione factura</option>
+                  <option value="00001234">00001234</option>
+                  <option value="00001235">00001235</option>
+                  <option value="00001236">00001236</option>
+                  <option value="00001237">00001237</option>
+                  <option value="00001238">00001238</option>
+                </select>
+              </div>
+            </div>
+            <div class="col-12 col-md-4">
+              <div class="search-field-group">
+                <label class="form-label d-none d-md-block">&nbsp;</label>
+                <button type="submit" class="btn btn-primary btn-search" id="btnBuscar">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+                  </svg>
+                  <span id="btnBuscarText">Buscar factura</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <div class="results-card card">
+        <div class="card-header" id="resultsHeader">Resultados de la consulta</div>
+        <div class="card-body" id="resultsBody">
+          <div class="results-empty">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2zM9.5 3A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5v2z"/>
+              <path d="M4.603 14.087a.81.81 0 0 1-.438-.42c-.195-.448-.148-.986.124-1.316l.307-.338.338-.307c.33-.272.868-.32 1.316-.124a.81.81 0 0 1 .42.438c.196.448.148.986-.124 1.316l-.307.338-.338.307a.81.81 0 0 1-.438.124z"/>
+            </svg>
+            <p>Seleccione los criterios y presione <strong id="emptyActionText">Buscar factura</strong>.</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <div class="modal fade" id="modalEditarUsuario" tabindex="-1" aria-labelledby="modalEditarUsuarioLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content modal-usuario">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalEditarUsuarioLabel">Editar datos del usuario</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <p class="profile-hint mb-3">Complete o corrija los datos del adquiriente. Los cambios se aplican de inmediato en la consulta actual.</p>
+          <div id="perfilUsuarioAlert" class="alert d-none mb-3" role="alert"></div>
+          <form id="perfilUsuarioForm" novalidate>
+            <div class="row g-3">
+              <div class="col-12 col-md-4">
+                <label for="usuarioTipoDocumento" class="form-label">Tipo de documento</label>
+                <select class="form-select" id="usuarioTipoDocumento" name="tipoDocumento" required>
+                  <option value="CC">Cédula de ciudadanía</option>
+                  <option value="CE">Cédula de extranjería</option>
+                  <option value="NIT">NIT</option>
+                  <option value="PA">Pasaporte</option>
+                  <option value="TI">Tarjeta de identidad</option>
+                </select>
+              </div>
+              <div class="col-12 col-md-4">
+                <label for="usuarioIdentificacion" class="form-label">Identificación</label>
+                <input type="text" class="form-control" id="usuarioIdentificacion" name="identificacion" required>
+              </div>
+              <div class="col-12 col-md-4">
+                <label for="usuarioRegimen" class="form-label">Régimen</label>
+                <select class="form-select" id="usuarioRegimen" name="regimen">
+                  <option value="">Seleccione régimen</option>
+                  <option value="No responsable de IVA">No responsable de IVA</option>
+                  <option value="Responsable de IVA">Responsable de IVA</option>
+                  <option value="Régimen simple">Régimen simple</option>
+                </select>
+              </div>
+              <div class="col-12 col-md-6">
+                <label for="usuarioNombres" class="form-label">Nombres</label>
+                <input type="text" class="form-control" id="usuarioNombres" name="nombres" required>
+              </div>
+              <div class="col-12 col-md-6">
+                <label for="usuarioApellidos" class="form-label">Apellidos</label>
+                <input type="text" class="form-control" id="usuarioApellidos" name="apellidos" required>
+              </div>
+              <div class="col-12 col-md-6">
+                <label for="usuarioEmail" class="form-label">E-mail</label>
+                <input type="email" class="form-control" id="usuarioEmail" name="email" placeholder="correo@ejemplo.com">
+              </div>
+              <div class="col-12 col-md-6">
+                <label for="usuarioTelefono" class="form-label">Teléfono</label>
+                <input type="tel" class="form-control" id="usuarioTelefono" name="telefono" placeholder="Ej: 300 123 4567">
+              </div>
+              <div class="col-12 col-md-4">
+                <label for="usuarioDepartamento" class="form-label">Departamento</label>
+                <input type="text" class="form-control" id="usuarioDepartamento" name="departamento">
+              </div>
+              <div class="col-12 col-md-4">
+                <label for="usuarioCiudad" class="form-label">Ciudad</label>
+                <input type="text" class="form-control" id="usuarioCiudad" name="ciudad">
+              </div>
+              <div class="col-12 col-md-4">
+                <label for="usuarioDireccion" class="form-label">Dirección</label>
+                <input type="text" class="form-control" id="usuarioDireccion" name="direccion" placeholder="Calle, número, barrio">
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" form="perfilUsuarioForm" class="btn btn-primary">Guardar cambios</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../lib/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="../assets/js/app.js"></script>
+</body>
+</html>

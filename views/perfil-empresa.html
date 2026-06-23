@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Perfil de la empresa — Facturación Electrónica</title>
+  <link rel="stylesheet" href="../lib/bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../assets/css/app.css">
+</head>
+<body data-require-auth class="app-page">
+
+  <header class="app-header">
+    <div class="container">
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div class="header-brand">
+          <img src="../assets/img/logo-ceere-software.png" alt="Ceere Software" class="header-logo-icon">
+          <div>
+            <h1 class="company-name" data-empresa-nombre>Mi Empresa S.A.S.</h1>
+            <p class="app-subtitle">Perfil de la empresa</p>
+          </div>
+        </div>
+        <div class="header-actions">
+          <a href="buscar-factura.html" class="header-action-btn">Volver a consulta</a>
+          <button type="button" class="header-action-btn header-action-btn-outline" id="btnCerrarSesion">Cerrar sesión</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <div class="container">
+      <div class="profile-card">
+        <h2 class="section-title">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M4 2.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1h1a.5.5 0 0 1 .5.5v1h1a.5.5 0 0 1 .5.5v1h1a.5.5 0 0 1 .5.5v1h-7a.5.5 0 0 1-.5-.5v-1H3a.5.5 0 0 1-.5-.5v-1H2a.5.5 0 0 1-.5-.5v-1H1a.5.5 0 0 1-.5-.5v-1h.5V2.5z"/>
+            <path d="M7 6.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-.5.5h-5a.5.5 0 0 1-.5-.5v-7z"/>
+          </svg>
+          Datos de la empresa
+        </h2>
+        <p class="profile-hint">Los campos bloqueados no pueden modificarse. Los cambios se guardan localmente en esta fase visual.</p>
+
+        <div id="perfilAlert" class="alert d-none mb-3" role="alert"></div>
+
+        <form id="perfilEmpresaForm" novalidate>
+          <div class="row g-3">
+            <div class="col-12 col-md-6">
+              <label for="perfilNombre" class="form-label">Nombre / Razón social</label>
+              <input type="text" class="form-control field-readonly" id="perfilNombre" readonly>
+              <span class="field-hint">No editable</span>
+            </div>
+            <div class="col-12 col-md-6">
+              <label for="perfilDocumento" class="form-label">Documento</label>
+              <input type="text" class="form-control field-readonly" id="perfilDocumento" readonly>
+              <span class="field-hint">No editable</span>
+            </div>
+            <div class="col-12 col-md-6">
+              <label for="perfilTipoDocumento" class="form-label">Tipo de documento</label>
+              <select class="form-select" id="perfilTipoDocumento" name="tipoDocumento" required>
+                <option value="NIT">NIT</option>
+                <option value="CC">Cédula de ciudadanía</option>
+                <option value="CE">Cédula de extranjería</option>
+                <option value="PA">Pasaporte</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label for="perfilDireccion" class="form-label">Dirección</label>
+              <input
+                type="text"
+                class="form-control"
+                id="perfilDireccion"
+                name="direccion"
+                placeholder="Ej: Calle 50 # 32-120, Medellín"
+                required
+              >
+            </div>
+            <div class="col-12 col-md-6">
+              <label for="perfilTelefono" class="form-label">Teléfono principal</label>
+              <input
+                type="tel"
+                class="form-control"
+                id="perfilTelefono"
+                name="telefono"
+                placeholder="Ej: 604 321 4567"
+                required
+              >
+            </div>
+            <div class="col-12 col-md-6">
+              <label for="perfilTelefono2" class="form-label">Teléfono alternativo</label>
+              <input
+                type="tel"
+                class="form-control"
+                id="perfilTelefono2"
+                name="telefono2"
+                placeholder="Opcional"
+              >
+            </div>
+          </div>
+          <div class="profile-actions">
+            <button type="submit" class="btn btn-primary">Guardar cambios</button>
+            <a href="buscar-factura.html" class="btn btn-outline-secondary">Cancelar</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </main>
+
+  <script src="../lib/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="../assets/js/app.js"></script>
+</body>
+</html>
