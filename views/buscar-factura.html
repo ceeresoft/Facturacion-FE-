@@ -25,6 +25,7 @@
         </div>
         <div class="header-actions">
           <div class="header-user-menu">
+            <button type="button" class="header-action-btn" id="btnCambiarEmpresa">Cambiar empresa</button>
             <a href="perfil-empresa.html" class="header-action-btn">Perfil empresa</a>
             <button type="button" class="header-action-btn header-action-btn-outline" id="btnCerrarSesion">Cerrar sesión</button>
           </div>
@@ -183,6 +184,31 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
           <button type="submit" form="perfilUsuarioForm" class="btn btn-primary">Guardar cambios</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div
+    class="modal fade"
+    id="modalSeleccionEmpresa"
+    tabindex="-1"
+    aria-labelledby="modalSeleccionEmpresaLabel"
+    aria-hidden="true"
+    data-bs-backdrop="static"
+    data-bs-keyboard="false"
+  >
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content modal-empresa">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalSeleccionEmpresaLabel">Seleccionar empresa</h5>
+        </div>
+        <div class="modal-body">
+          <p class="profile-hint mb-3">Elija con qué empresa desea trabajar en esta sesión.</p>
+          <div id="empresaOptionsList" class="empresa-options-list" role="radiogroup" aria-label="Empresas disponibles"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" id="btnConfirmarEmpresa" disabled>Continuar</button>
         </div>
       </div>
     </div>

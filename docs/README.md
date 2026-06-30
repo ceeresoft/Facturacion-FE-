@@ -12,7 +12,7 @@ Interfaz web para la migración del aplicativo de facturación electrónica. Pal
 | Header | `#0c4a6e` |
 | Fondo | `#f0f9ff` |
 | Logo desarrollador | `assets/img/logo-ceere-software.png` (Ceere Software) |
-| Nombre clínica | `data-empresa-nombre` / `EMPRESA_PERFIL_DEFAULT` |
+| Nombre clínica | `data-empresa-nombre` / empresa activa en `EMPRESAS_MOCK` |
 
 ---
 
@@ -52,10 +52,26 @@ Abrir `http://localhost:8080` → login → pantalla principal.
 
 - Usuario y contraseña (validación visual).
 - Inicia sesión en `localStorage` (`fe-sesion`) y redirige a la consulta.
+- Al iniciar sesión se limpia la empresa activa para forzar la selección.
+
+### Selección de empresa (post-login)
+
+Tras el login, en `buscar-factura.html` y `perfil-empresa.html` aparece el modal **`#modalSeleccionEmpresa`** (obligatorio, sin cerrar hasta elegir):
+
+| Clave | Contenido |
+|-------|-----------|
+| `fe-empresa-activa` | ID de la empresa en uso (ej. `emp-001`) |
+| `fe-empresa-perfiles` | Objeto con datos editables por empresa: `{ [id]: { tipoDocumento, direccion, telefono, telefono2 } }` |
+
+Catálogo mock en `EMPRESAS_MOCK` (`assets/js/app.js`): 3 empresas de ejemplo.
+
+- **Continuar** guarda la selección y actualiza el nombre en el header (`data-empresa-nombre`).
+- **Cambiar empresa** (header) reabre el modal; al cambiar se limpian los resultados de consulta.
+- Al cerrar sesión se elimina `fe-empresa-activa`.
 
 ### Cerrar sesión
 
-Botón en el encabezado. Elimina la sesión y vuelve al login.
+Botón en el encabezado. Elimina la sesión y la empresa activa; vuelve al login.
 
 ### Pantallas protegidas
 
@@ -66,7 +82,16 @@ Botón en el encabezado. Elimina la sesión y vuelve al login.
 
 | Enlace | Descripción |
 |--------|-------------|
+| Cambiar empresa | Reabre el modal de selección |
 | Perfil empresa | Datos del emisor (página dedicada) |
+| Cerrar sesión | Salir de la aplicación |
+
+### Acciones del encabezado (perfil empresa)
+
+| Enlace | Descripción |
+|--------|-------------|
+| Cambiar empresa | Reabre el modal de selección |
+| Volver a consulta | Regresa a la búsqueda |
 | Cerrar sesión | Salir de la aplicación |
 
 ---
@@ -116,7 +141,9 @@ No hay enlace "Perfil usuario" en el header; la edición es solo desde los resul
 
 ## Perfil de la empresa (`views/perfil-empresa.html`)
 
-Almacenamiento: `fe-empresa-perfil`
+Almacenamiento: `fe-empresa-perfiles` (por ID de empresa activa)
+
+Los datos editables se guardan **por empresa**. Al cambiar de empresa, el formulario carga el perfil correspondiente.
 
 ### Editables
 
@@ -180,7 +207,9 @@ Estado, Número factura, Fecha, Medio de pago, Subtotal, IVA, Descuento, Retenci
 
 | Qué | Dónde |
 |-----|-------|
-| Empresa fija | `EMPRESA_PERFIL_DEFAULT` en `app.js` |
+| Catálogo de empresas | `EMPRESAS_MOCK` en `app.js` |
+| Empresa activa | `fe-empresa-activa` en `localStorage` |
+| Perfiles por empresa | `fe-empresa-perfiles` en `app.js` / `localStorage` |
 | Usuario por defecto | `USUARIO_PERFIL_DEFAULT` en `app.js` |
 | Colores | `:root` en `app.css` |
 | Logo Ceere | `assets/img/logo-ceere-software.png` |

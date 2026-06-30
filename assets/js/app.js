@@ -1,15 +1,52 @@
 const SESSION_KEY = "fe-sesion";
-const EMPRESA_PERFIL_KEY = "fe-empresa-perfil";
+const EMPRESA_ACTIVA_KEY = "fe-empresa-activa";
+const EMPRESA_PERFILES_KEY = "fe-empresa-perfiles";
 const USUARIO_PERFIL_KEY = "fe-usuario-perfil";
 
-const EMPRESA_PERFIL_DEFAULT = {
-  nombre: "Mi Empresa S.A.S.",
-  documento: "900.123.456-7",
-  tipoDocumento: "NIT",
-  direccion: "Calle 50 # 32-120, El Poblado",
-  telefono: "604 321 4567",
-  telefono2: "300 987 6543",
-};
+const EMPRESAS_MOCK = [
+  {
+    id: "emp-001",
+    nombre: "Mi Empresa S.A.S.",
+    documento: "900.123.456-7",
+    tipoDocumento: "NIT",
+    direccion: "Calle 50 # 32-120, El Poblado",
+    telefono: "604 321 4567",
+    telefono2: "300 987 6543",
+    departamento: "Antioquia",
+    ciudad: "Medellín",
+    barrio: "El Poblado",
+    email: "facturacion@miempresa.com",
+    regimen: "Responsable de IVA",
+  },
+  {
+    id: "emp-002",
+    nombre: "Clínica Salud Integral S.A.S.",
+    documento: "900.987.654-3",
+    tipoDocumento: "NIT",
+    direccion: "Carrera 43A # 1-50, Medellín",
+    telefono: "604 444 5566",
+    telefono2: "",
+    departamento: "Antioquia",
+    ciudad: "Medellín",
+    barrio: "El Poblado",
+    email: "facturacion@clinicasalud.com",
+    regimen: "Responsable de IVA",
+  },
+  {
+    id: "emp-003",
+    nombre: "Centro Médico del Norte Ltda.",
+    documento: "800.456.789-1",
+    tipoDocumento: "NIT",
+    direccion: "Autopista Norte # 127-30",
+    telefono: "601 555 7788",
+    telefono2: "310 222 3344",
+    departamento: "Cundinamarca",
+    ciudad: "Bogotá",
+    barrio: "Usaquén",
+    email: "contacto@centromediconorte.com",
+    regimen: "Régimen simple",
+  },
+];
 
 const USUARIO_PERFIL_DEFAULT = {
   tipoDocumento: "CC",
@@ -27,6 +64,8 @@ const USUARIO_PERFIL_DEFAULT = {
 let tipoEnvioActual = "factura";
 let ultimaConsulta = null;
 let modalUsuarioInstance = null;
+let modalEmpresaInstance = null;
+let empresaSeleccionadaId = null;
 
 const ACCORDION_IDS = ["secEmpresa", "secUsuario", "secFactura", "secItems"];
 
@@ -91,9 +130,12 @@ const NOTA_CREDITO_MOCK = {
 };
 
 document.addEventListener("DOMContentLoaded", () => {
+  migrarPerfilEmpresaLegacy();
   initSession();
   initLogin();
   initLogout();
+  initSeleccionEmpresa();
+  initCambiarEmpresa();
   initMenuEnvio();
   initBuscarFactura();
   initPerfilEmpresa();
@@ -107,10 +149,12 @@ function isSessionActive() {
 
 function iniciarSesion() {
   localStorage.setItem(SESSION_KEY, "true");
+  localStorage.removeItem(EMPRESA_ACTIVA_KEY);
 }
 
 function cerrarSesion() {
   localStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(EMPRESA_ACTIVA_KEY);
   window.location.href = "login.html";
 }
 
@@ -134,66 +178,249 @@ function initLogout() {
   btn.addEventListener("click", cerrarSesion);
 }
 
-function getEmpresaPerfil() {
+function migrarPerfilEmpresaLegacy() {
+  const legacyKey = "fe-empresa-perfil";
+  const legacy = localStorage.getItem(legacyKey);
+  if (!legacy) return;
+
   try {
-    const saved = JSON.parse(localStorage.getItem(EMPRESA_PERFIL_KEY) || "{}");
-    return {
-      ...EMPRESA_PERFIL_DEFAULT,
-      ...saved,
-      nombre: EMPRESA_PERFIL_DEFAULT.nombre,
-      documento: EMPRESA_PERFIL_DEFAULT.documento,
-    };
+    const data = JSON.parse(legacy);
+    const perfiles = getEmpresasPerfilesStore();
+    if (!perfiles["emp-001"]) {
+      perfiles["emp-001"] = {
+        tipoDocumento: data.tipoDocumento,
+        direccion: data.direccion,
+        telefono: data.telefono,
+        telefono2: data.telefono2 || "",
+      };
+      saveEmpresasPerfilesStore(perfiles);
+    }
+    localStorage.removeItem(legacyKey);
   } catch {
-    return { ...EMPRESA_PERFIL_DEFAULT };
+    localStorage.removeItem(legacyKey);
   }
 }
 
+function getEmpresaActivaId() {
+  return localStorage.getItem(EMPRESA_ACTIVA_KEY);
+}
+
+function setEmpresaActiva(id) {
+  localStorage.setItem(EMPRESA_ACTIVA_KEY, id);
+}
+
+function clearEmpresaActiva() {
+  localStorage.removeItem(EMPRESA_ACTIVA_KEY);
+}
+
+function getEmpresaById(id) {
+  return EMPRESAS_MOCK.find((empresa) => empresa.id === id) || null;
+}
+
+function getEmpresaActiva() {
+  const id = getEmpresaActivaId();
+  return id ? getEmpresaById(id) : null;
+}
+
+function getEmpresasPerfilesStore() {
+  try {
+    return JSON.parse(localStorage.getItem(EMPRESA_PERFILES_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function saveEmpresasPerfilesStore(perfiles) {
+  localStorage.setItem(EMPRESA_PERFILES_KEY, JSON.stringify(perfiles));
+}
+
+function getEmpresaPerfilOverrides(id) {
+  const perfiles = getEmpresasPerfilesStore();
+  return perfiles[id] || {};
+}
+
+function getEmpresaPerfil() {
+  const base = getEmpresaActiva();
+  if (!base) {
+    return null;
+  }
+
+  const overrides = getEmpresaPerfilOverrides(base.id);
+  return {
+    ...base,
+    ...overrides,
+    nombre: base.nombre,
+    documento: base.documento,
+  };
+}
+
 function saveEmpresaPerfil(data) {
-  const toSave = {
+  const activa = getEmpresaActiva();
+  if (!activa) return;
+
+  const perfiles = getEmpresasPerfilesStore();
+  perfiles[activa.id] = {
     tipoDocumento: data.tipoDocumento,
     direccion: data.direccion,
     telefono: data.telefono,
     telefono2: data.telefono2 || "",
   };
-  localStorage.setItem(EMPRESA_PERFIL_KEY, JSON.stringify(toSave));
+  saveEmpresasPerfilesStore(perfiles);
 }
 
 function getEmpresaParaFactura() {
   const perfil = getEmpresaPerfil();
+  if (!perfil) {
+    return { ...FACTURA_MOCK.empresa };
+  }
+
   return {
-    ...FACTURA_MOCK.empresa,
     tipoDocumento: perfil.tipoDocumento,
     documento: perfil.documento,
     razonSocial: perfil.nombre,
     direccion: perfil.direccion,
     telefono: perfil.telefono,
     telefono2: perfil.telefono2,
+    departamento: perfil.departamento,
+    ciudad: perfil.ciudad,
+    barrio: perfil.barrio,
+    email: perfil.email,
+    regimen: perfil.regimen,
   };
 }
 
 function applyEmpresaNombre() {
-  const nombre = getEmpresaPerfil().nombre;
+  const activa = getEmpresaActiva();
+  const nombre = activa ? activa.nombre : "—";
   document.querySelectorAll("[data-empresa-nombre]").forEach((el) => {
     el.textContent = nombre;
   });
 }
 
-function initPerfilEmpresa() {
+function cargarFormularioEmpresa() {
   const form = document.getElementById("perfilEmpresaForm");
   if (!form) return;
 
   const perfil = getEmpresaPerfil();
-  const alertBox = document.getElementById("perfilAlert");
-
+  if (!perfil) return;
   form.querySelector("#perfilNombre").value = perfil.nombre;
   form.querySelector("#perfilDocumento").value = perfil.documento;
   form.querySelector("#perfilTipoDocumento").value = perfil.tipoDocumento;
   form.querySelector("#perfilDireccion").value = perfil.direccion;
   form.querySelector("#perfilTelefono").value = perfil.telefono;
   form.querySelector("#perfilTelefono2").value = perfil.telefono2 || "";
+}
+
+function limpiarResultadosConsulta() {
+  ultimaConsulta = null;
+  const resultsBody = document.getElementById("resultsBody");
+  if (!resultsBody) return;
+  resetResultsEmpty(resultsBody, tipoEnvioActual === "nota_credito");
+}
+
+function renderEmpresaOptions() {
+  const container = document.getElementById("empresaOptionsList");
+  if (!container) return;
+
+  const activaId = getEmpresaActivaId();
+  empresaSeleccionadaId = activaId;
+
+  container.innerHTML = EMPRESAS_MOCK.map(
+    (empresa) => `
+      <label class="empresa-option${empresa.id === activaId ? " active" : ""}">
+        <input
+          type="radio"
+          name="empresaSeleccion"
+          class="empresa-option-input"
+          value="${empresa.id}"
+          ${empresa.id === activaId ? "checked" : ""}
+        >
+        <span class="empresa-option-body">
+          <span class="empresa-option-nombre">${empresa.nombre}</span>
+          <span class="empresa-option-doc">${empresa.tipoDocumento} ${empresa.documento}</span>
+        </span>
+      </label>
+    `
+  ).join("");
+
+  container.querySelectorAll(".empresa-option-input").forEach((input) => {
+    input.addEventListener("change", () => {
+      empresaSeleccionadaId = input.value;
+      container.querySelectorAll(".empresa-option").forEach((option) => {
+        option.classList.toggle("active", option.contains(input) && input.checked);
+      });
+      actualizarBotonConfirmarEmpresa();
+    });
+  });
+
+  actualizarBotonConfirmarEmpresa();
+}
+
+function actualizarBotonConfirmarEmpresa() {
+  const btn = document.getElementById("btnConfirmarEmpresa");
+  if (btn) {
+    btn.disabled = !empresaSeleccionadaId;
+  }
+}
+
+function abrirModalSeleccionEmpresa() {
+  const modalEl = document.getElementById("modalSeleccionEmpresa");
+  if (!modalEl) return;
+
+  renderEmpresaOptions();
+  modalEmpresaInstance =
+    modalEmpresaInstance || bootstrap.Modal.getOrCreateInstance(modalEl);
+  modalEmpresaInstance.show();
+}
+
+function confirmarSeleccionEmpresa() {
+  if (!empresaSeleccionadaId) return;
+
+  const anteriorId = getEmpresaActivaId();
+  setEmpresaActiva(empresaSeleccionadaId);
+  applyEmpresaNombre();
+  cargarFormularioEmpresa();
+
+  if (anteriorId && anteriorId !== empresaSeleccionadaId) {
+    limpiarResultadosConsulta();
+  }
+
+  modalEmpresaInstance?.hide();
+}
+
+function initSeleccionEmpresa() {
+  const modalEl = document.getElementById("modalSeleccionEmpresa");
+  if (!modalEl || !document.body.hasAttribute("data-require-auth")) return;
+
+  const btnConfirmar = document.getElementById("btnConfirmarEmpresa");
+  btnConfirmar?.addEventListener("click", confirmarSeleccionEmpresa);
+
+  if (!getEmpresaActivaId()) {
+    abrirModalSeleccionEmpresa();
+  }
+}
+
+function initCambiarEmpresa() {
+  const btn = document.getElementById("btnCambiarEmpresa");
+  if (!btn) return;
+  btn.addEventListener("click", abrirModalSeleccionEmpresa);
+}
+
+function initPerfilEmpresa() {
+  const form = document.getElementById("perfilEmpresaForm");
+  if (!form) return;
+
+  const alertBox = document.getElementById("perfilAlert");
+  cargarFormularioEmpresa();
 
   form.addEventListener("submit", (e) => {
     e.preventDefault();
+
+    if (!getEmpresaActiva()) {
+      showPerfilAlert(alertBox, "Seleccione una empresa para continuar.", "warning");
+      abrirModalSeleccionEmpresa();
+      return;
+    }
 
     const tipoDocumento = form.querySelector("#perfilTipoDocumento").value;
     const direccion = form.querySelector("#perfilDireccion").value.trim();

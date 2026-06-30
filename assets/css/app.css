@@ -925,6 +925,80 @@ body.modo-nota-credito .field-nota-credito {
   box-shadow: 0 0 0 0.2rem var(--focus-ring);
 }
 
+.modal-empresa .modal-header {
+  background: var(--header-bg);
+  color: #fff;
+}
+
+.modal-empresa .modal-title {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.modal-empresa .modal-footer {
+  border-top: 1px solid var(--border);
+  padding: 1rem 1.25rem;
+}
+
+.modal-empresa .modal-footer .btn-primary {
+  min-width: 8rem;
+}
+
+.empresa-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.empresa-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0.9rem 1rem;
+  border: 2px solid var(--border);
+  border-radius: 0.65rem;
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.empresa-option:hover {
+  border-color: #bae6fd;
+  background: #f8fcff;
+}
+
+.empresa-option.active {
+  border-color: var(--primary);
+  background: #f0f9ff;
+  box-shadow: 0 0 0 0.15rem var(--focus-ring);
+}
+
+.empresa-option-input {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+  accent-color: var(--primary);
+}
+
+.empresa-option-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.empresa-option-nombre {
+  font-weight: 700;
+  font-size: 0.9375rem;
+  color: var(--primary-dark);
+  line-height: 1.3;
+}
+
+.empresa-option-doc {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
 .mock-notice {
   font-size: 0.8125rem;
   color: var(--text-muted);
