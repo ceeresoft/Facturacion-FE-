@@ -15,7 +15,7 @@
         <div class="header-brand">
           <img src="../assets/img/logo-ceere-software.png" alt="Ceere Software" class="header-logo-icon">
           <div>
-            <h1 class="company-name" data-empresa-nombre>Mi Empresa S.A.S.</h1>
+            <h1 class="company-name" data-empresa-nombre>[Pendiente integrar]</h1>
             <p class="app-subtitle">Perfil de la empresa</p>
           </div>
         </div>
@@ -38,7 +38,7 @@
           </svg>
           Datos de la empresa
         </h2>
-        <p class="profile-hint">Los campos bloqueados no pueden modificarse. Los cambios se guardan localmente en esta fase visual.</p>
+        <p class="profile-hint">Los campos bloqueados provienen de la tabla Empresa. Dirección y teléfonos se guardan en EmpresaIII.</p>
 
         <div id="perfilAlert" class="alert d-none mb-3" role="alert"></div>
 
@@ -56,12 +56,8 @@
             </div>
             <div class="col-12 col-md-6">
               <label for="perfilTipoDocumento" class="form-label">Tipo de documento</label>
-              <select class="form-select" id="perfilTipoDocumento" name="tipoDocumento" required>
-                <option value="NIT">NIT</option>
-                <option value="CC">Cédula de ciudadanía</option>
-                <option value="CE">Cédula de extranjería</option>
-                <option value="PA">Pasaporte</option>
-              </select>
+              <input type="text" class="form-control field-readonly" id="perfilTipoDocumento" readonly>
+              <span class="field-hint">No editable</span>
             </div>
             <div class="col-12">
               <label for="perfilDireccion" class="form-label">Dirección</label>
@@ -125,6 +121,31 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-primary" id="btnConfirmarEmpresa" disabled>Continuar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div
+    class="modal fade"
+    id="modalPerfilGuardado"
+    tabindex="-1"
+    aria-labelledby="modalPerfilGuardadoLabel"
+    aria-hidden="true"
+  >
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content modal-empresa">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalPerfilGuardadoLabel">Actualización exitosa</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-0" data-perfil-guardado-mensaje>
+            Los datos de la empresa se actualizaron correctamente.
+          </p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Aceptar</button>
         </div>
       </div>
     </div>

@@ -1,61 +1,21 @@
+const API_BASE_URL = "http://localhost:3005";
 const SESSION_KEY = "fe-sesion";
+const TOKEN_KEY = "fe-token";
+const USER_KEY = "fe-user";
 const EMPRESA_ACTIVA_KEY = "fe-empresa-activa";
-const EMPRESA_PERFILES_KEY = "fe-empresa-perfiles";
 const USUARIO_PERFIL_KEY = "fe-usuario-perfil";
 
-const EMPRESAS_MOCK = [
-  {
-    id: "emp-001",
-    nombre: "Mi Empresa S.A.S.",
-    documento: "900.123.456-7",
-    tipoDocumento: "NIT",
-    direccion: "Calle 50 # 32-120, El Poblado",
-    telefono: "604 321 4567",
-    telefono2: "300 987 6543",
-    departamento: "Antioquia",
-    ciudad: "Medellín",
-    barrio: "El Poblado",
-    email: "facturacion@miempresa.com",
-    regimen: "Responsable de IVA",
-  },
-  {
-    id: "emp-002",
-    nombre: "Clínica Salud Integral S.A.S.",
-    documento: "900.987.654-3",
-    tipoDocumento: "NIT",
-    direccion: "Carrera 43A # 1-50, Medellín",
-    telefono: "604 444 5566",
-    telefono2: "",
-    departamento: "Antioquia",
-    ciudad: "Medellín",
-    barrio: "El Poblado",
-    email: "facturacion@clinicasalud.com",
-    regimen: "Responsable de IVA",
-  },
-  {
-    id: "emp-003",
-    nombre: "Centro Médico del Norte Ltda.",
-    documento: "800.456.789-1",
-    tipoDocumento: "NIT",
-    direccion: "Autopista Norte # 127-30",
-    telefono: "601 555 7788",
-    telefono2: "310 222 3344",
-    departamento: "Cundinamarca",
-    ciudad: "Bogotá",
-    barrio: "Usaquén",
-    email: "contacto@centromediconorte.com",
-    regimen: "Régimen simple",
-  },
-];
+/** Texto visible donde aún no hay integración con backend */
+const PENDIENTE_INTEGRAR = "[Pendiente integrar]";
 
 const USUARIO_PERFIL_DEFAULT = {
-  tipoDocumento: "CC",
-  identificacion: "1.234.567.890",
-  nombres: "Juan Carlos",
-  apellidos: "Pérez Gómez",
+  tipoDocumento: "",
+  identificacion: "",
+  nombres: "",
+  apellidos: "",
   email: "",
-  departamento: "Antioquia",
-  ciudad: "Medellín",
+  departamento: "",
+  ciudad: "",
   direccion: "",
   telefono: "",
   regimen: "",
@@ -63,72 +23,22 @@ const USUARIO_PERFIL_DEFAULT = {
 
 let tipoEnvioActual = "factura";
 let ultimaConsulta = null;
+let empresasCatalogo = [];
+let empresasCatalogoPromise = null;
 let modalUsuarioInstance = null;
 let modalEmpresaInstance = null;
+let modalPerfilGuardadoInstance = null;
 let empresaSeleccionadaId = null;
+let ultimaEntidadConsulta = null;
 
 const ACCORDION_IDS = ["secEmpresa", "secUsuario", "secFactura", "secItems"];
 
-const FACTURA_MOCK = {
-  empresa: {
-    tipoDocumento: "NIT",
-    documento: "900.123.456-7",
-    razonSocial: "Clínica Salud Integral S.A.S.",
-    departamento: "Antioquia",
-    ciudad: "Medellín",
-    barrio: "El Poblado",
-    email: "facturacion@clinicasalud.com",
-    regimen: "Responsable de IVA",
-  },
-  usuario: {
-    tipoDocumento: "CC",
-    identificacion: "1.234.567.890",
-    nombres: "Juan Carlos",
-    apellidos: "Pérez Gómez",
-    email: "juan.perez@email.com",
-    departamento: "Antioquia",
-    ciudad: "Medellín",
-    direccion: "Calle 10 # 43-28",
-    telefono: "300 123 4567",
-    regimen: "No responsable de IVA",
-  },
-  estado: "Aprobada",
-  numeroFactura: "00001234",
-  fecha: "15/06/2026",
-  medioPago: "Transferencia bancaria",
-  subtotal: 1250000,
-  iva: 237500,
-  descuento: 50000,
-  retencionFuente: 31250,
-  retencionIva: 35625,
-  otrasRetenciones: 0,
-  total: 1375625,
-  items: [
-    {
-      codigo: "SRV-001",
-      descripcion: "Consultoría en sistemas de información",
-      cantidad: 10,
-      precioUnitario: 85000,
-      iva: 161500,
-      subtotal: 850000,
-    },
-    {
-      codigo: "SRV-002",
-      descripcion: "Soporte técnico mensual",
-      cantidad: 2,
-      precioUnitario: 200000,
-      iva: 76000,
-      subtotal: 400000,
-    },
-  ],
-};
-
-const NOTA_CREDITO_MOCK = {
-  ...FACTURA_MOCK,
-  numeroNotaCredito: "NC-000001",
-  estado: "Aprobada",
-};
-
+/**
+ * Integraciones pendientes:
+ * - Nota crédito: controladorFacturaNotaNC.php
+ * - Envío XML / SOAP: generadorXMLFactura.php (líneas 1630+)
+ * - Perfil usuario en BD (hoy solo localStorage en consulta)
+ */
 document.addEventListener("DOMContentLoaded", () => {
   migrarPerfilEmpresaLegacy();
   initSession();
@@ -144,31 +54,109 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function isSessionActive() {
-  return localStorage.getItem(SESSION_KEY) === "true";
+  return (
+    localStorage.getItem(SESSION_KEY) === "true" &&
+    Boolean(localStorage.getItem(TOKEN_KEY))
+  );
 }
 
-function iniciarSesion() {
+function getAuthToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+async function apiFetch(path, options = {}) {
+  const token = getAuthToken();
+  const headers = { ...options.headers };
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  if (options.body && !headers["Content-Type"]) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  return fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers,
+  });
+}
+
+function getAuthUser() {
+  try {
+    const raw = localStorage.getItem(USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function iniciarSesion(token, user) {
   localStorage.setItem(SESSION_KEY, "true");
+  localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
   localStorage.removeItem(EMPRESA_ACTIVA_KEY);
 }
 
 function cerrarSesion() {
   localStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
   localStorage.removeItem(EMPRESA_ACTIVA_KEY);
   window.location.href = "login.html";
+}
+
+async function validarSesionActiva() {
+  const token = getAuthToken();
+  if (!token) return false;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) return false;
+
+    const data = await response.json();
+    if (data.user) {
+      localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+    }
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function initSession() {
   const requiereAuth = document.body.hasAttribute("data-require-auth");
   const esLogin = document.getElementById("loginForm");
 
-  if (requiereAuth && !isSessionActive()) {
-    window.location.href = "login.html";
+  if (requiereAuth) {
+    if (!isSessionActive()) {
+      window.location.href = "login.html";
+      return;
+    }
+
+    validarSesionActiva().then((valida) => {
+      if (!valida) {
+        localStorage.removeItem(SESSION_KEY);
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(USER_KEY);
+        window.location.href = "login.html";
+      }
+    });
     return;
   }
 
   if (esLogin && isSessionActive()) {
-    window.location.href = "buscar-factura.html";
+    validarSesionActiva().then((valida) => {
+      if (valida) {
+        window.location.href = "buscar-factura.html";
+      } else {
+        localStorage.removeItem(SESSION_KEY);
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(USER_KEY);
+      }
+    });
   }
 }
 
@@ -179,26 +167,8 @@ function initLogout() {
 }
 
 function migrarPerfilEmpresaLegacy() {
-  const legacyKey = "fe-empresa-perfil";
-  const legacy = localStorage.getItem(legacyKey);
-  if (!legacy) return;
-
-  try {
-    const data = JSON.parse(legacy);
-    const perfiles = getEmpresasPerfilesStore();
-    if (!perfiles["emp-001"]) {
-      perfiles["emp-001"] = {
-        tipoDocumento: data.tipoDocumento,
-        direccion: data.direccion,
-        telefono: data.telefono,
-        telefono2: data.telefono2 || "",
-      };
-      saveEmpresasPerfilesStore(perfiles);
-    }
-    localStorage.removeItem(legacyKey);
-  } catch {
-    localStorage.removeItem(legacyKey);
-  }
+  localStorage.removeItem("fe-empresa-perfil");
+  localStorage.removeItem("fe-empresa-perfiles");
 }
 
 function getEmpresaActivaId() {
@@ -214,29 +184,38 @@ function clearEmpresaActiva() {
 }
 
 function getEmpresaById(id) {
-  return EMPRESAS_MOCK.find((empresa) => empresa.id === id) || null;
+  return (
+    empresasCatalogo.find((empresa) => String(empresa.id) === String(id)) ||
+    null
+  );
+}
+
+async function cargarEmpresasCatalogo() {
+  if (empresasCatalogo.length) {
+    return empresasCatalogo;
+  }
+
+  if (!empresasCatalogoPromise) {
+    empresasCatalogoPromise = apiFetch("/api/empresas/catalogo")
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.message || "No se pudieron cargar las empresas");
+        }
+        empresasCatalogo = data.empresas || [];
+        return empresasCatalogo;
+      })
+      .finally(() => {
+        empresasCatalogoPromise = null;
+      });
+  }
+
+  return empresasCatalogoPromise;
 }
 
 function getEmpresaActiva() {
   const id = getEmpresaActivaId();
   return id ? getEmpresaById(id) : null;
-}
-
-function getEmpresasPerfilesStore() {
-  try {
-    return JSON.parse(localStorage.getItem(EMPRESA_PERFILES_KEY) || "{}");
-  } catch {
-    return {};
-  }
-}
-
-function saveEmpresasPerfilesStore(perfiles) {
-  localStorage.setItem(EMPRESA_PERFILES_KEY, JSON.stringify(perfiles));
-}
-
-function getEmpresaPerfilOverrides(id) {
-  const perfiles = getEmpresasPerfilesStore();
-  return perfiles[id] || {};
 }
 
 function getEmpresaPerfil() {
@@ -245,53 +224,52 @@ function getEmpresaPerfil() {
     return null;
   }
 
-  const overrides = getEmpresaPerfilOverrides(base.id);
   return {
     ...base,
-    ...overrides,
     nombre: base.nombre,
     documento: base.documento,
+    tipoDocumento: base.tipoDocumento,
+    direccion: base.direccion ?? "",
+    telefono: base.telefono ?? "",
+    telefono2: base.telefono2 ?? "",
+    email: base.email ?? "",
+    email2: base.email2 ?? "",
   };
 }
 
-function saveEmpresaPerfil(data) {
-  const activa = getEmpresaActiva();
-  if (!activa) return;
-
-  const perfiles = getEmpresasPerfilesStore();
-  perfiles[activa.id] = {
-    tipoDocumento: data.tipoDocumento,
-    direccion: data.direccion,
-    telefono: data.telefono,
-    telefono2: data.telefono2 || "",
-  };
-  saveEmpresasPerfilesStore(perfiles);
+function actualizarEmpresaEnCache(empresa) {
+  const index = empresasCatalogo.findIndex(
+    (item) => String(item.id) === String(empresa.id)
+  );
+  if (index >= 0) {
+    empresasCatalogo[index] = empresa;
+  } else {
+    empresasCatalogo.push(empresa);
+  }
 }
 
-function getEmpresaParaFactura() {
-  const perfil = getEmpresaPerfil();
-  if (!perfil) {
-    return { ...FACTURA_MOCK.empresa };
+async function guardarEmpresaPerfilEnApi(idEmpresa, data) {
+  const response = await apiFetch(`/api/empresas/catalogo/${idEmpresa}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  const payload = await response.json();
+
+  if (!response.ok) {
+    throw new Error(payload.message || "No se pudo guardar el perfil de la empresa");
   }
 
-  return {
-    tipoDocumento: perfil.tipoDocumento,
-    documento: perfil.documento,
-    razonSocial: perfil.nombre,
-    direccion: perfil.direccion,
-    telefono: perfil.telefono,
-    telefono2: perfil.telefono2,
-    departamento: perfil.departamento,
-    ciudad: perfil.ciudad,
-    barrio: perfil.barrio,
-    email: perfil.email,
-    regimen: perfil.regimen,
-  };
+  if (payload.empresa) {
+    actualizarEmpresaEnCache(payload.empresa);
+  }
+
+  return payload.empresa;
 }
 
 function applyEmpresaNombre() {
   const activa = getEmpresaActiva();
-  const nombre = activa ? activa.nombre : "—";
+  const nombre = activa ? activa.nombre : PENDIENTE_INTEGRAR;
   document.querySelectorAll("[data-empresa-nombre]").forEach((el) => {
     el.textContent = nombre;
   });
@@ -303,37 +281,52 @@ function cargarFormularioEmpresa() {
 
   const perfil = getEmpresaPerfil();
   if (!perfil) return;
-  form.querySelector("#perfilNombre").value = perfil.nombre;
-  form.querySelector("#perfilDocumento").value = perfil.documento;
-  form.querySelector("#perfilTipoDocumento").value = perfil.tipoDocumento;
-  form.querySelector("#perfilDireccion").value = perfil.direccion;
-  form.querySelector("#perfilTelefono").value = perfil.telefono;
+  form.querySelector("#perfilNombre").value = perfil.nombre || "";
+  form.querySelector("#perfilDocumento").value = perfil.documento || "";
+  form.querySelector("#perfilTipoDocumento").value = perfil.tipoDocumento || "";
+  form.querySelector("#perfilDireccion").value = perfil.direccion || "";
+  form.querySelector("#perfilTelefono").value = perfil.telefono || "";
   form.querySelector("#perfilTelefono2").value = perfil.telefono2 || "";
 }
 
 function limpiarResultadosConsulta() {
   ultimaConsulta = null;
+  ultimaEntidadConsulta = null;
   const resultsBody = document.getElementById("resultsBody");
   if (!resultsBody) return;
   resetResultsEmpty(resultsBody, tipoEnvioActual === "nota_credito");
 }
 
-function renderEmpresaOptions() {
+async function renderEmpresaOptions() {
   const container = document.getElementById("empresaOptionsList");
   if (!container) return;
 
   const activaId = getEmpresaActivaId();
   empresaSeleccionadaId = activaId;
 
-  container.innerHTML = EMPRESAS_MOCK.map(
-    (empresa) => `
-      <label class="empresa-option${empresa.id === activaId ? " active" : ""}">
+  container.innerHTML =
+    '<p class="text-muted mb-0">Cargando empresas...</p>';
+
+  try {
+    const empresas = await cargarEmpresasCatalogo();
+
+    if (!empresas.length) {
+      container.innerHTML =
+        '<p class="text-muted mb-0">No hay empresas disponibles.</p>';
+      actualizarBotonConfirmarEmpresa();
+      return;
+    }
+
+    container.innerHTML = empresas
+      .map(
+        (empresa) => `
+      <label class="empresa-option${String(empresa.id) === String(activaId) ? " active" : ""}">
         <input
           type="radio"
           name="empresaSeleccion"
           class="empresa-option-input"
           value="${empresa.id}"
-          ${empresa.id === activaId ? "checked" : ""}
+          ${String(empresa.id) === String(activaId) ? "checked" : ""}
         >
         <span class="empresa-option-body">
           <span class="empresa-option-nombre">${empresa.nombre}</span>
@@ -341,17 +334,24 @@ function renderEmpresaOptions() {
         </span>
       </label>
     `
-  ).join("");
+      )
+      .join("");
 
-  container.querySelectorAll(".empresa-option-input").forEach((input) => {
-    input.addEventListener("change", () => {
-      empresaSeleccionadaId = input.value;
-      container.querySelectorAll(".empresa-option").forEach((option) => {
-        option.classList.toggle("active", option.contains(input) && input.checked);
+    container.querySelectorAll(".empresa-option-input").forEach((input) => {
+      input.addEventListener("change", () => {
+        empresaSeleccionadaId = input.value;
+        container.querySelectorAll(".empresa-option").forEach((option) => {
+          option.classList.toggle(
+            "active",
+            option.contains(input) && input.checked
+          );
+        });
+        actualizarBotonConfirmarEmpresa();
       });
-      actualizarBotonConfirmarEmpresa();
     });
-  });
+  } catch (error) {
+    container.innerHTML = `<p class="text-danger mb-0">${error.message || "Error al cargar empresas."}</p>`;
+  }
 
   actualizarBotonConfirmarEmpresa();
 }
@@ -363,11 +363,11 @@ function actualizarBotonConfirmarEmpresa() {
   }
 }
 
-function abrirModalSeleccionEmpresa() {
+async function abrirModalSeleccionEmpresa() {
   const modalEl = document.getElementById("modalSeleccionEmpresa");
   if (!modalEl) return;
 
-  renderEmpresaOptions();
+  await renderEmpresaOptions();
   modalEmpresaInstance =
     modalEmpresaInstance || bootstrap.Modal.getOrCreateInstance(modalEl);
   modalEmpresaInstance.show();
@@ -395,15 +395,26 @@ function initSeleccionEmpresa() {
   const btnConfirmar = document.getElementById("btnConfirmarEmpresa");
   btnConfirmar?.addEventListener("click", confirmarSeleccionEmpresa);
 
-  if (!getEmpresaActivaId()) {
-    abrirModalSeleccionEmpresa();
-  }
+  cargarEmpresasCatalogo()
+    .then(() => {
+      applyEmpresaNombre();
+      if (!getEmpresaActivaId()) {
+        abrirModalSeleccionEmpresa();
+      }
+    })
+    .catch(() => {
+      if (!getEmpresaActivaId()) {
+        abrirModalSeleccionEmpresa();
+      }
+    });
 }
 
 function initCambiarEmpresa() {
   const btn = document.getElementById("btnCambiarEmpresa");
   if (!btn) return;
-  btn.addEventListener("click", abrirModalSeleccionEmpresa);
+  btn.addEventListener("click", () => {
+    abrirModalSeleccionEmpresa();
+  });
 }
 
 function initPerfilEmpresa() {
@@ -411,49 +422,109 @@ function initPerfilEmpresa() {
   if (!form) return;
 
   const alertBox = document.getElementById("perfilAlert");
-  cargarFormularioEmpresa();
+  cargarEmpresasCatalogo().then(() => cargarFormularioEmpresa());
 
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    if (!getEmpresaActiva()) {
+    const activa = getEmpresaActiva();
+    if (!activa) {
       showPerfilAlert(alertBox, "Seleccione una empresa para continuar.", "warning");
       abrirModalSeleccionEmpresa();
       return;
     }
 
-    const tipoDocumento = form.querySelector("#perfilTipoDocumento").value;
     const direccion = form.querySelector("#perfilDireccion").value.trim();
     const telefono = form.querySelector("#perfilTelefono").value.trim();
     const telefono2 = form.querySelector("#perfilTelefono2").value.trim();
+    const submitBtn = form.querySelector('button[type="submit"]');
 
     if (!direccion || !telefono) {
       showPerfilAlert(alertBox, "Complete la dirección y el teléfono principal.", "warning");
       return;
     }
 
-    saveEmpresaPerfil({ tipoDocumento, direccion, telefono, telefono2 });
-    applyEmpresaNombre();
-    showPerfilAlert(alertBox, "Perfil actualizado correctamente.", "success");
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Guardando...";
+    }
+
+    try {
+      await guardarEmpresaPerfilEnApi(activa.id, {
+        direccion,
+        telefono,
+        telefono2,
+        email: activa.email || "",
+        email2: activa.email2 || "",
+      });
+      cargarFormularioEmpresa();
+      applyEmpresaNombre();
+      if (alertBox) {
+        alertBox.classList.add("d-none");
+      }
+      mostrarModalPerfilGuardado(
+        "Los datos de la empresa se actualizaron correctamente."
+      );
+    } catch (error) {
+      showPerfilAlert(
+        alertBox,
+        error.message || "No se pudo guardar el perfil de la empresa.",
+        "danger"
+      );
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Guardar cambios";
+      }
+    }
   });
 }
 
-function getUsuarioPerfil() {
+function getUsuarioEdiciones() {
   try {
-    const saved = JSON.parse(localStorage.getItem(USUARIO_PERFIL_KEY) || "{}");
-    return { ...USUARIO_PERFIL_DEFAULT, ...saved };
+    return JSON.parse(localStorage.getItem(USUARIO_PERFIL_KEY) || "{}");
   } catch {
-    return { ...USUARIO_PERFIL_DEFAULT };
+    return {};
   }
+}
+
+function getUsuarioPerfil() {
+  return ultimaEntidadConsulta || { ...USUARIO_PERFIL_DEFAULT, ...getUsuarioEdiciones() };
 }
 
 function saveUsuarioPerfil(data) {
   localStorage.setItem(USUARIO_PERFIL_KEY, JSON.stringify(data));
 }
 
-function getUsuarioParaFactura() {
-  const perfil = getUsuarioPerfil();
-  return { ...FACTURA_MOCK.usuario, ...perfil };
+/** Entidad/responsable de la factura (API). No mezclar documento del usuario logueado. */
+function mergeEntidadConEdiciones(entidadApi) {
+  const base = entidadApi || {};
+  const ediciones = getUsuarioEdiciones();
+  const camposDesdeApi = [
+    "tipoDocumento",
+    "identificacion",
+    "nombres",
+    "apellidos",
+    "nombreCompleto",
+  ];
+
+  const merged = { ...base };
+
+  Object.entries(ediciones).forEach(([key, value]) => {
+    if (!value || !String(value).trim()) return;
+
+    if (
+      camposDesdeApi.includes(key) &&
+      base[key] &&
+      String(base[key]).trim()
+    ) {
+      return;
+    }
+
+    merged[key] = value;
+  });
+
+  return merged;
 }
 
 function isUsuarioIncompleto(usuario) {
@@ -542,11 +613,31 @@ function refrescarResultados() {
 
   const resultsBody = document.getElementById("resultsBody");
   const openPanels = getAccordionOpenState();
-  const { numeroFactura, numeroNotaCredito, esNotaCredito } = ultimaConsulta;
-  const datos = buildMockData(numeroFactura, numeroNotaCredito, esNotaCredito);
+  const { numeroFactura, numeroNotaCredito, esNotaCredito, empresaId } =
+    ultimaConsulta;
 
-  renderFacturaResult(resultsBody, datos, esNotaCredito);
-  restoreAccordionOpenState(openPanels);
+  if (!empresaId) {
+    showResultsMessage(
+      resultsBody,
+      "warning",
+      `${PENDIENTE_INTEGRAR} Falta empresa/resolución para refrescar la consulta.`
+    );
+    restoreAccordionOpenState(openPanels);
+    return;
+  }
+
+  consultarFacturaApi(numeroFactura, empresaId)
+    .then((data) => {
+      const datos = mapApiToViewModel(
+        data,
+        numeroFactura,
+        numeroNotaCredito,
+        esNotaCredito
+      );
+      renderFacturaResult(resultsBody, datos, esNotaCredito);
+      restoreAccordionOpenState(openPanels);
+    })
+    .catch(() => {});
 }
 
 function initModalUsuario() {
@@ -599,6 +690,21 @@ function showPerfilAlert(container, message, type) {
   container.classList.remove("d-none");
 }
 
+function mostrarModalPerfilGuardado(mensaje) {
+  const modalEl = document.getElementById("modalPerfilGuardado");
+  if (!modalEl) return;
+
+  const mensajeEl = modalEl.querySelector("[data-perfil-guardado-mensaje]");
+  if (mensajeEl) {
+    mensajeEl.textContent = mensaje;
+  }
+
+  modalPerfilGuardadoInstance =
+    modalPerfilGuardadoInstance ||
+    bootstrap.Modal.getOrCreateInstance(modalEl);
+  modalPerfilGuardadoInstance.show();
+}
+
 function initLogin() {
   const form = document.getElementById("loginForm");
   if (!form) return;
@@ -618,19 +724,55 @@ function initLogin() {
     });
   }
 
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
     const usuario = form.querySelector("#usuario").value.trim();
     const password = form.querySelector("#password").value.trim();
+    const submitBtn = form.querySelector('button[type="submit"]');
 
     if (!usuario || !password) {
       showAlert(alertBox, "Por favor ingrese usuario y contraseña.", "warning");
       return;
     }
 
-    iniciarSesion();
-    window.location.href = "buscar-factura.html";
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Iniciando sesión...";
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ usuario, password }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        showAlert(
+          alertBox,
+          data.message || "Credenciales inválidas. Verifique usuario y contraseña.",
+          "danger"
+        );
+        return;
+      }
+
+      iniciarSesion(data.token, data.user);
+      window.location.href = "buscar-factura.html";
+    } catch {
+      showAlert(
+        alertBox,
+        "No se pudo conectar con el servidor. Verifique que el API esté en ejecución (puerto 3005).",
+        "danger"
+      );
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Iniciar sesión";
+      }
+    }
   });
 }
 
@@ -695,13 +837,190 @@ function resetResultsEmpty(container, esNotaCredito) {
   `;
 }
 
+async function cargarResoluciones() {
+  const select = document.getElementById("resolucion");
+  if (!select) return;
+
+  select.innerHTML =
+    '<option value="" selected disabled>Cargando resoluciones...</option>';
+
+  try {
+    const response = await apiFetch("/api/empresas");
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "No se pudieron cargar las resoluciones");
+    }
+
+    if (!data.empresas?.length) {
+      select.innerHTML =
+        '<option value="" selected disabled>Sin resoluciones disponibles</option>';
+      return;
+    }
+
+    select.innerHTML =
+      '<option value="" selected disabled>Seleccione una resolución</option>';
+
+    data.empresas.forEach((empresa) => {
+      const option = document.createElement("option");
+      option.value = empresa.id;
+      option.textContent = empresa.label;
+      if (empresa.inactiva) {
+        option.style.color = "red";
+      }
+      select.appendChild(option);
+    });
+  } catch (error) {
+    select.innerHTML =
+      '<option value="" selected disabled>Error al cargar resoluciones</option>';
+    console.error(error);
+  }
+}
+
+async function cargarFacturasPorResolucion(idEmpresaV) {
+  const select = document.getElementById("numeroFactura");
+  if (!select) return;
+
+  if (!idEmpresaV) {
+    select.innerHTML =
+      '<option value="" selected disabled>Seleccione factura</option>';
+    return;
+  }
+
+  select.innerHTML =
+    '<option value="" selected disabled>Cargando facturas...</option>';
+
+  try {
+    const response = await apiFetch(`/api/empresas/${idEmpresaV}/facturas`);
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "No se pudieron cargar las facturas");
+    }
+
+    if (!data.facturas?.length) {
+      select.innerHTML =
+        '<option value="" selected disabled>No hay facturas realizadas</option>';
+      return;
+    }
+
+    select.innerHTML =
+      '<option value="" selected disabled>Seleccione factura</option>';
+
+    data.facturas.forEach((factura) => {
+      const option = document.createElement("option");
+      option.value = factura.numero;
+      option.textContent = factura.numero;
+      select.appendChild(option);
+    });
+  } catch (error) {
+    select.innerHTML =
+      '<option value="" selected disabled>Error al cargar facturas</option>';
+    console.error(error);
+  }
+}
+
+async function consultarFacturaApi(numeroFactura, empresaId) {
+  const response = await apiFetch(
+    `/api/facturas/${encodeURIComponent(numeroFactura)}?empresaId=${encodeURIComponent(empresaId)}`
+  );
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || "No se pudo consultar la factura");
+  }
+
+  return data;
+}
+
+function mapApiToViewModel(data, numeroFactura, numeroNotaCredito, esNotaCredito) {
+  const factura = data.factura || {};
+  const entidad = mergeEntidadConEdiciones(data.usuario);
+  ultimaEntidadConsulta = entidad;
+
+  return {
+    empresa: data.empresa || {},
+    usuario: entidad,
+    estado: factura.estado || "—",
+    numeroFactura: factura.numeroFactura || numeroFactura,
+    fecha: factura.fecha || "—",
+    medioPago: factura.medioPago || "—",
+    subtotal: factura.subtotal ?? 0,
+    iva: factura.iva ?? 0,
+    descuento: factura.descuento ?? 0,
+    retencionFuente: factura.retencionFuente ?? 0,
+    retencionIva: factura.retencionIva ?? 0,
+    otrasRetenciones: factura.otrasRetenciones ?? 0,
+    total: factura.total ?? 0,
+    items: data.items || [],
+    ...(esNotaCredito && numeroNotaCredito ? { numeroNotaCredito } : {}),
+  };
+}
+
+async function generarXmlFacturaDesdeConsulta() {
+  if (!ultimaConsulta?.empresaId || !ultimaConsulta?.numeroFactura) {
+    window.alert("Consulte una factura antes de generar el XML.");
+    return;
+  }
+
+  const btn = document.getElementById("btnGenerarXml");
+  const prevText = btn?.textContent;
+
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Generando XML...";
+  }
+
+  try {
+    const { numeroFactura, empresaId } = ultimaConsulta;
+    const response = await apiFetch(
+      `/api/facturas/${encodeURIComponent(numeroFactura)}/generar-xml?empresaId=${encodeURIComponent(empresaId)}`,
+      { method: "POST" }
+    );
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "No se pudo generar el XML");
+    }
+
+    window.alert(
+      data.message ||
+        `XML guardado en la carpeta xml del proyecto (${data.relativePath || data.fileName}).`
+    );
+  } catch (error) {
+    window.alert(error.message || "Error al generar el XML.");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = prevText || "Generar XML";
+    }
+  }
+}
+
 function initBuscarFactura() {
   const form = document.getElementById("buscarForm");
   if (!form) return;
 
   const resultsBody = document.getElementById("resultsBody");
+  const resolucionSelect = form.querySelector("#resolucion");
+  const submitBtn = form.querySelector("#btnBuscar");
 
-  form.addEventListener("submit", (e) => {
+  resultsBody?.addEventListener("click", (event) => {
+    if (event.target.closest(".btn-generar-xml")) {
+      event.preventDefault();
+      generarXmlFacturaDesdeConsulta();
+    }
+  });
+
+  cargarResoluciones();
+
+  resolucionSelect?.addEventListener("change", () => {
+    cargarFacturasPorResolucion(resolucionSelect.value);
+    ultimaConsulta = null;
+    resetResultsEmpty(resultsBody, tipoEnvioActual === "nota_credito");
+  });
+
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
     const resolucion = form.querySelector("#resolucion").value;
@@ -738,21 +1057,47 @@ function initBuscarFactura() {
       return;
     }
 
-    ultimaConsulta = { numeroFactura, numeroNotaCredito, esNotaCredito };
-    const datos = buildMockData(numeroFactura, numeroNotaCredito, esNotaCredito);
-    renderFacturaResult(resultsBody, datos, esNotaCredito);
-  });
-}
+    ultimaConsulta = {
+      numeroFactura,
+      numeroNotaCredito,
+      esNotaCredito,
+      empresaId: resolucion,
+    };
 
-function buildMockData(numeroFactura, numeroNotaCredito, esNotaCredito) {
-  const base = esNotaCredito ? NOTA_CREDITO_MOCK : FACTURA_MOCK;
-  return {
-    ...base,
-    empresa: getEmpresaParaFactura(),
-    usuario: getUsuarioParaFactura(),
-    numeroFactura,
-    ...(esNotaCredito && { numeroNotaCredito }),
-  };
+    const btnText = submitBtn?.querySelector("#btnBuscarText");
+    const prevText = btnText?.textContent;
+
+    if (submitBtn) {
+      submitBtn.disabled = true;
+    }
+    if (btnText) {
+      btnText.textContent = "Consultando...";
+    }
+
+    try {
+      const data = await consultarFacturaApi(numeroFactura, resolucion);
+      const datos = mapApiToViewModel(
+        data,
+        numeroFactura,
+        numeroNotaCredito,
+        esNotaCredito
+      );
+      renderFacturaResult(resultsBody, datos, esNotaCredito);
+    } catch (error) {
+      showResultsMessage(
+        resultsBody,
+        "warning",
+        error.message || "Error al consultar la factura."
+      );
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+      }
+      if (btnText && prevText) {
+        btnText.textContent = prevText;
+      }
+    }
+  });
 }
 
 function formatMoney(value) {
@@ -820,22 +1165,22 @@ const ICONS = {
   items: '<path d="M0 2.5A.5.5 0 0 1 .5 2H2a.5.5 0 0 1 .485.379L2.89 4H14.5a.5.5 0 0 1 .485.621l-1.5 6A.5.5 0 0 1 13 11H4a.5.5 0 0 1-.485-.379L1.61 3H.5a.5.5 0 0 1-.5-.5zM3.14 5l1.25 5h8.22l1.25-5H3.14z"/>',
 };
 
-function renderEmpresaSection(empresa) {
+function renderEmpresaSection(empresa = {}) {
   const telefonos = empresa.telefono2
     ? `${empresa.telefono} / ${empresa.telefono2}`
     : empresa.telefono;
 
   const fields = [
-    { label: "Tipo documento", value: empresa.tipoDocumento },
-    { label: "Documento", value: empresa.documento },
-    { label: "Razón Social", value: empresa.razonSocial },
-    { label: "Dirección", value: empresa.direccion || "—" },
-    { label: "Teléfonos", value: telefonos || "—" },
-    { label: "Departamento", value: empresa.departamento },
-    { label: "Ciudad", value: empresa.ciudad },
-    { label: "Barrio", value: empresa.barrio },
-    { label: "E-mail", value: empresa.email },
-    { label: "Régimen", value: empresa.regimen },
+    { label: "Tipo documento", value: displayValue(empresa.tipoDocumento) },
+    { label: "Documento", value: displayValue(empresa.documento) },
+    { label: "Razón Social", value: displayValue(empresa.razonSocial) },
+    { label: "Dirección", value: displayValue(empresa.direccion) },
+    { label: "Teléfonos", value: displayValue(telefonos) },
+    { label: "Departamento", value: displayValue(empresa.departamento) },
+    { label: "Ciudad", value: displayValue(empresa.ciudad) },
+    { label: "Barrio", value: displayValue(empresa.barrio) },
+    { label: "E-mail", value: displayValue(empresa.email) },
+    { label: "Régimen", value: displayValue(empresa.regimen) },
   ];
   return renderAccordionSection(
     "secEmpresa",
@@ -869,7 +1214,7 @@ function renderUsuarioSection(usuario) {
   ];
   return renderAccordionSection(
     "secUsuario",
-    "Información usuario",
+    "Información del responsable",
     ICONS.usuario,
     `${avisoIncompleto}<div class="info-grid">${renderInfoGrid(fields)}</div>
      <p class="mt-3 mb-0"><button type="button" class="btn btn-link btn-editar-usuario p-0">Editar datos del usuario</button></p>`,
@@ -979,17 +1324,29 @@ function renderFacturaResult(container, datos, esNotaCredito) {
     ? renderNotaCreditoBanner(datos.numeroNotaCredito)
     : "";
 
+  const avisoIntegracion = esNotaCredito
+    ? `<p class="integracion-notice mb-3">${PENDIENTE_INTEGRAR} Consulta de nota crédito (API nota crédito pendiente). Se muestran datos de la factura asociada.</p>`
+    : "";
+
+  const accionesXml = esNotaCredito
+    ? ""
+    : `<div class="results-actions mt-3 d-flex flex-wrap align-items-center gap-2">
+        <button type="button" class="btn btn-primary btn-generar-xml" id="btnGenerarXml">
+          Generar XML
+        </button>
+        <span class="text-muted small">Genera el archivo XML localmente. No envía a Facturatech/DIAN.</span>
+      </div>`;
+
   container.innerHTML = `
     ${banner}
+    ${avisoIntegracion}
     <div class="accordion sesiones-accordion" id="sesionesAccordion">
       ${renderEmpresaSection(datos.empresa)}
       ${renderUsuarioSection(datos.usuario)}
       ${renderFacturaSection(datos, esNotaCredito)}
       ${renderItemsSection(datos.items, esNotaCredito)}
     </div>
-    <p class="mock-notice mb-0">
-      Datos de ejemplo — fase visual. Los valores reales se cargarán desde el backend en la fase 2.
-    </p>
+    ${accionesXml}
   `;
 }
 
