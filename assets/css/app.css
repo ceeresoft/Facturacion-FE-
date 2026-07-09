@@ -376,6 +376,32 @@ body {
   color: var(--header-bg);
 }
 
+a.header-nav-btn,
+.header-nav-link {
+  text-decoration: none;
+  display: inline-block;
+}
+
+.pdf-preview-body {
+  min-height: 70vh;
+  background: #e2e8f0;
+}
+
+.pdf-preview-frame {
+  width: 100%;
+  min-height: 70vh;
+  border: 0;
+  display: block;
+}
+
+.fe-actions-cell {
+  white-space: nowrap;
+}
+
+.fe-actions-cell .btn {
+  margin-right: 0.35rem;
+}
+
 .header-actions {
   display: flex;
   flex-wrap: wrap;
@@ -942,6 +968,48 @@ body.modo-nota-credito .field-nota-credito {
 
 .modal-empresa .modal-footer .btn-primary {
   min-width: 8rem;
+}
+
+.modal-respuesta .modal-header {
+  background: var(--header-bg);
+  color: #fff;
+  border-bottom: none;
+}
+
+.modal-respuesta .modal-header .btn-close {
+  filter: invert(1);
+}
+
+.modal-respuesta .modal-title {
+  font-weight: 600;
+}
+
+.modal-respuesta .modal-footer {
+  border-top: 1px solid var(--border);
+}
+
+.respuesta-mensaje {
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.respuesta-mensaje.respuesta-error {
+  color: #b91c1c;
+}
+
+.respuesta-mensaje.respuesta-success {
+  color: #047857;
+}
+
+.respuesta-mensaje.respuesta-warning {
+  color: #b45309;
+}
+
+.modal-respuesta .modal-body {
+  max-height: 65vh;
+  overflow-y: auto;
 }
 
 .empresa-options-list {

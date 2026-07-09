@@ -1,0 +1,163 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-facturatech-wsdl-2026",
+    "name": "Facturatech WSDL — Pruebas SOAP",
+    "description": "Variables en la pestaña **Variables** de esta colección (no requiere entorno).\n\n1. getCUFEFile\n2. uploadInvoiceFile\n3. documentStatusFile",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. getCUFEFile — Consultar CUFE",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const body = pm.response.text();",
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const cufeMatch = body.match(/<resourceData[^>]*>([^<]+)<\\/resourceData>/i);",
+              "const codeMatch = body.match(/<code[^>]*>([^<]+)<\\/code>/i);",
+              "if (codeMatch) pm.collectionVariables.set('lastCode', codeMatch[1].trim());",
+              "if (cufeMatch && cufeMatch[1]) {",
+              "  pm.collectionVariables.set('cufe', cufeMatch[1].trim());",
+              "  console.log('CUFE:', cufeMatch[1].trim());",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "text/xml; charset=utf-8" },
+          { "key": "SOAPAction", "value": "FtechAction.getCUFEFile" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<SOAP-ENV:Envelope xmlns:SOAP-ENV=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <SOAP-ENV:Body>\n    <FtechAction.getCUFEFile>\n      <username>{{username}}</username>\n      <password>{{password}}</password>\n      <prefijo>{{prefijo}}</prefijo>\n      <folio>{{folio}}</folio>\n    </FtechAction.getCUFEFile>\n  </SOAP-ENV:Body>\n</SOAP-ENV:Envelope>"
+        },
+        "url": {
+          "raw": "{{wsdlUrl}}",
+          "host": ["{{wsdlUrl}}"]
+        }
+      }
+    },
+    {
+      "name": "2. uploadInvoiceFile — Subir XML",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const body = pm.response.text();",
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const txMatch = body.match(/<transaccionID[^>]*>([^<]+)<\\/transaccionID>/i);",
+              "const codeMatch = body.match(/<code[^>]*>([^<]+)<\\/code>/i);",
+              "if (codeMatch) pm.collectionVariables.set('lastCode', codeMatch[1].trim());",
+              "if (txMatch && txMatch[1]) {",
+              "  pm.collectionVariables.set('transaccionID', txMatch[1].trim());",
+              "  console.log('transaccionID:', txMatch[1].trim());",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "text/xml; charset=utf-8" },
+          { "key": "SOAPAction", "value": "FtechAction.uploadInvoiceFile" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<SOAP-ENV:Envelope xmlns:SOAP-ENV=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <SOAP-ENV:Body>\n    <FtechAction.uploadInvoiceFile>\n      <username>{{username}}</username>\n      <password>{{password}}</password>\n      <xmlBase64>{{xmlBase64}}</xmlBase64>\n    </FtechAction.uploadInvoiceFile>\n  </SOAP-ENV:Body>\n</SOAP-ENV:Envelope>"
+        },
+        "url": {
+          "raw": "{{wsdlUrl}}",
+          "host": ["{{wsdlUrl}}"]
+        }
+      }
+    },
+    {
+      "name": "3. documentStatusFile — Estado del envío",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const body = pm.response.text();",
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const codeMatch = body.match(/<code[^>]*>([^<]+)<\\/code>/i);",
+              "if (codeMatch) pm.collectionVariables.set('lastCode', codeMatch[1].trim());"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "text/xml; charset=utf-8" },
+          { "key": "SOAPAction", "value": "FtechAction.documentStatusFile" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<SOAP-ENV:Envelope xmlns:SOAP-ENV=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <SOAP-ENV:Body>\n    <FtechAction.documentStatusFile>\n      <username>{{username}}</username>\n      <password>{{password}}</password>\n      <transaccionID>{{transaccionID}}</transaccionID>\n    </FtechAction.documentStatusFile>\n  </SOAP-ENV:Body>\n</SOAP-ENV:Envelope>"
+        },
+        "url": {
+          "raw": "{{wsdlUrl}}",
+          "host": ["{{wsdlUrl}}"]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "wsdlUrl",
+      "value": "https://ws.facturatech.co/v2/pro/index.php",
+      "type": "string"
+    },
+    {
+      "key": "username",
+      "value": "TU_USUARIO_FACTURATECH",
+      "type": "string"
+    },
+    {
+      "key": "password",
+      "value": "TU_PASSWORD_FACTURATECH",
+      "type": "string"
+    },
+    {
+      "key": "prefijo",
+      "value": "TCFA",
+      "type": "string"
+    },
+    {
+      "key": "folio",
+      "value": "0800",
+      "type": "string"
+    },
+    {
+      "key": "xmlBase64",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "transaccionID",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "cufe",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "lastCode",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

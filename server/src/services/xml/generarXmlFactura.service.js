@@ -1,26 +1,17 @@
 import fs from "fs/promises";
 import path from "path";
-import { fileURLToPath } from "url";
 import { cargarDatosXmlFactura } from "./facturaXmlData.service.js";
 import { buildFacturaXml } from "./facturaXmlBuilder.service.js";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SERVER_ROOT = path.join(__dirname, "../../..");
-const PROJECT_ROOT = path.join(SERVER_ROOT, "..");
-
-function resolveXmlOutputDir() {
-  if (process.env.XML_OUTPUT_DIR) {
-    return path.isAbsolute(process.env.XML_OUTPUT_DIR)
-      ? process.env.XML_OUTPUT_DIR
-      : path.resolve(SERVER_ROOT, process.env.XML_OUTPUT_DIR);
-  }
-  return path.join(PROJECT_ROOT, "xml");
-}
+import {
+  resolveXmlOutputDir,
+  toRelativeXmlPath,
+  xmlFileNameFactura,
+} from "../../utils/xmlPaths.js";
 
 export async function generarXmlFactura(numero, idEmpresaV, { guardarArchivo = true } = {}) {
   const data = await cargarDatosXmlFactura(numero, idEmpresaV);
   const xml = buildFacturaXml(data);
-  const fileName = `face_${data.factura.numF}.xml`;
+  const fileName = xmlFileNameFactura(data.factura.numF);
   let filePath = null;
   let relativePath = null;
 
@@ -29,7 +20,7 @@ export async function generarXmlFactura(numero, idEmpresaV, { guardarArchivo = t
     await fs.mkdir(outputDir, { recursive: true });
     filePath = path.join(outputDir, fileName);
     await fs.writeFile(filePath, xml, "utf8");
-    relativePath = path.relative(PROJECT_ROOT, filePath).split(path.sep).join("/");
+    relativePath = toRelativeXmlPath(filePath);
   }
 
   return {

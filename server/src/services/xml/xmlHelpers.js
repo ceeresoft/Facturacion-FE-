@@ -3,6 +3,35 @@ export function txt(value) {
   return String(value);
 }
 
+/**
+ * Código municipio DANE (5 dígitos: depto + ciudad).
+ * Si la ciudad trae menos de 5 dígitos (ej. 001), antepone el departamento (ej. 05 → 05001).
+ */
+export function resolverCodigoMunicipioDian(codigoCiudad, codigoDepartamento) {
+  const ciudad = String(codigoCiudad ?? "")
+    .trim()
+    .replace(/\D/g, "");
+  const depto = String(codigoDepartamento ?? "")
+    .trim()
+    .replace(/\D/g, "");
+
+  if (!ciudad) {
+    return txt(codigoCiudad);
+  }
+
+  if (ciudad.length >= 5) {
+    return ciudad;
+  }
+
+  if (!depto) {
+    return ciudad;
+  }
+
+  const deptoPadded = depto.padStart(2, "0").slice(-2);
+  const ciudadPadded = ciudad.padStart(3, "0").slice(-3);
+  return `${deptoPadded}${ciudadPadded}`;
+}
+
 export function formatDateYmd(value) {
   if (!value) return "";
   const date = value instanceof Date ? value : new Date(value);

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Imprimir factura electrónica</title>
+  <link rel="stylesheet" href="../lib/bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../assets/css/app.css">
+</head>
+<body data-require-auth data-page="imprimir-factura" class="app-page">
+
+  <header class="app-header">
+    <div class="container">
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div class="header-brand">
+          <img src="../assets/img/logo-ceere-software.png" alt="Ceere Software" class="header-logo-icon">
+          <nav class="header-nav" aria-label="Navegación principal">
+            <a href="buscar-factura.html" class="header-nav-btn header-nav-link">Envío electrónico</a>
+            <span class="header-nav-btn active">Imprimir factura</span>
+          </nav>
+          <div>
+            <h1 class="company-name" data-empresa-nombre>[Pendiente integrar]</h1>
+            <p class="app-subtitle">Facturas electrónicas enviadas</p>
+          </div>
+        </div>
+        <div class="header-actions">
+          <div class="header-user-menu">
+            <button type="button" class="header-action-btn" id="btnCambiarEmpresa">Cambiar empresa</button>
+            <a href="perfil-empresa.html" class="header-action-btn">Perfil empresa</a>
+            <button type="button" class="header-action-btn header-action-btn-outline" id="btnCerrarSesion">Cerrar sesión</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <div class="container">
+
+      <div class="search-card">
+        <h2 class="section-title">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M2.5 3A1.5 1.5 0 0 0 1 4.5v.793c.026.009.051.02.076.032L7.674 8.51c.206.1.446.1.652 0l6.598-3.185A.755.755 0 0 1 15 5.293V4.5A1.5 1.5 0 0 0 13.5 3h-11Z"/>
+            <path d="M15 6.954 8.978 9.86a2.25 2.25 0 0 1-1.956 0L1 6.954V11.5A1.5 1.5 0 0 0 2.5 13h11a1.5 1.5 0 0 0 1.5-1.5V6.954Z"/>
+          </svg>
+          Facturas enviadas a la DIAN
+        </h2>
+        <p class="text-muted mb-0">
+          Solo se listan facturas con <strong>EstadoFacturaElectronica = 1</strong>.
+          El PDF se obtiene desde Facturatech al ver o descargar.
+        </p>
+      </div>
+
+      <div class="results-card card">
+        <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+          <span>Facturas firmadas</span>
+          <button type="button" class="btn btn-sm btn-outline-primary" id="btnRecargarFacturasElectronicas">
+            Actualizar lista
+          </button>
+        </div>
+        <div class="card-body" id="facturasElectronicasBody">
+          <div class="results-empty">
+            <p>Cargando facturas electrónicas…</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <div class="modal fade" id="modalPdfFactura" tabindex="-1" aria-labelledby="modalPdfFacturaLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalPdfFacturaLabel">Vista previa PDF</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body p-0 pdf-preview-body">
+          <iframe id="pdfPreviewFrame" title="Vista previa factura PDF" class="pdf-preview-frame"></iframe>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+          <button type="button" class="btn btn-primary" id="btnDescargarPdfModal">Descargar PDF</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div
+    class="modal fade"
+    id="modalSeleccionEmpresa"
+    tabindex="-1"
+    aria-labelledby="modalSeleccionEmpresaLabel"
+    aria-hidden="true"
+    data-bs-backdrop="static"
+    data-bs-keyboard="false"
+  >
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content modal-empresa">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalSeleccionEmpresaLabel">Seleccionar empresa</h5>
+        </div>
+        <div class="modal-body">
+          <p class="profile-hint mb-3">Elija con qué empresa desea trabajar en esta sesión.</p>
+          <div id="empresaOptionsList" class="empresa-options-list" role="radiogroup" aria-label="Empresas disponibles"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" id="btnConfirmarEmpresa" disabled>Continuar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../lib/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="../assets/js/app.js"></script>
+</body>
+</html>

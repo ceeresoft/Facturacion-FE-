@@ -25,7 +25,14 @@
  */
 
 import { create } from "xmlbuilder2";
-import { appendFlat, txt } from "./xmlHelpers.js";
+import { appendFlat, resolverCodigoMunicipioDian, txt } from "./xmlHelpers.js";
+
+function codigoMunicipioAdquiriente(adquiriente) {
+  return resolverCodigoMunicipioDian(
+    adquiriente.codigoCiudad,
+    adquiriente.departE
+  );
+}
 
 /**
  * Bloque ADQ para persona natural (cédula, tarjeta de identidad, etc.).
@@ -44,7 +51,7 @@ function buildAdqNatural(bloqueAdquiriente, adquiriente) {
     ["ADQ_15", adquiriente.codigoPaisEnt],
     ["ADQ_19", adquiriente.nombreDepartamentoEnt],
     ["ADQ_21", adquiriente.nombrePaisEnt],
-    ["ADQ_23", adquiriente.codigoCiudad],
+    ["ADQ_23", codigoMunicipioAdquiriente(adquiriente)],
   ]);
 }
 
@@ -65,7 +72,7 @@ function buildAdqJuridico(bloqueAdquiriente, adquiriente) {
     ["ADQ_19", adquiriente.nombreDepartamentoEnt],
     ["ADQ_21", adquiriente.paisE],
     ["ADQ_22", adquiriente.digitoVerificacion],
-    ["ADQ_23", adquiriente.codigoCiudad],
+    ["ADQ_23", codigoMunicipioAdquiriente(adquiriente)],
   ]);
 }
 
@@ -263,7 +270,7 @@ export function buildFacturaXml(datosXml) {
     ["DFA_1", adquiriente.codigoPaisEnt],
     ["DFA_2", adquiriente.departE],
     ["DFA_3", adquiriente.paisE],
-    ["DFA_4", adquiriente.codigoCiudad],
+    ["DFA_4", codigoMunicipioAdquiriente(adquiriente)],
     ["DFA_5", adquiriente.nombrePaisEnt],
     ["DFA_6", adquiriente.nombreDepartamentoEnt],
     ["DFA_7", adquiriente.ciudadE],

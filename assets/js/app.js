@@ -30,8 +30,156 @@ let modalEmpresaInstance = null;
 let modalPerfilGuardadoInstance = null;
 let empresaSeleccionadaId = null;
 let ultimaEntidadConsulta = null;
+let feModoConfig = { facturaModo: "enviar", notaCreditoModo: "enviar" };
+let modalRespuestaInstance = null;
+let modalConfirmarInstance = null;
+let confirmarResolver = null;
 
 const ACCORDION_IDS = ["secEmpresa", "secUsuario", "secFactura", "secItems"];
+
+function escapeHtml(text) {
+  return String(text ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function formatMensajeRespuesta(raw) {
+  let text = String(raw ?? "").trim();
+  if (!text) return "";
+
+  const textarea = document.createElement("textarea");
+  textarea.innerHTML = text;
+  text = textarea.value;
+
+  text = text.replace(/<br\s*\/?>/gi, "\n");
+  text = text.replace(/\s*(\[Paso[^\]]+\])/g, "\n\n$1");
+  text = text.replace(/\s*(Regla\s+[A-Z0-9]+)/gi, "\n\n$1");
+
+  return escapeHtml(text)
+    .replace(/\n/g, "<br>")
+    .replace(/\[Paso[^\]]+\]/g, (match) => `<strong>${match}</strong>`);
+}
+
+function ensureModalesMensajes() {
+  if (document.getElementById("modalRespuesta")) return;
+
+  document.body.insertAdjacentHTML(
+    "beforeend",
+    `
+    <div class="modal fade" id="modalRespuesta" tabindex="-1" aria-labelledby="modalRespuestaLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-scrollable modal-lg modal-dialog-centered">
+        <div class="modal-content modal-respuesta">
+          <div class="modal-header">
+            <h5 class="modal-title" id="modalRespuestaLabel">Respuesta</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+          </div>
+          <div class="modal-body">
+            <div id="modalRespuestaBody" class="respuesta-mensaje"></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal fade" id="modalConfirmar" tabindex="-1" aria-labelledby="modalConfirmarLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content modal-respuesta">
+          <div class="modal-header">
+            <h5 class="modal-title" id="modalConfirmarLabel">Confirmar</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+          </div>
+          <div class="modal-body">
+            <div id="modalConfirmarBody" class="respuesta-mensaje"></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" id="btnConfirmarNo" data-bs-dismiss="modal">Cancelar</button>
+            <button type="button" class="btn btn-primary" id="btnConfirmarSi">Continuar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    `
+  );
+
+  const modalConfirmarEl = document.getElementById("modalConfirmar");
+  modalConfirmarEl?.addEventListener("hidden.bs.modal", () => {
+    if (confirmarResolver) {
+      confirmarResolver(false);
+      confirmarResolver = null;
+    }
+  });
+
+  document.getElementById("btnConfirmarSi")?.addEventListener("click", () => {
+    if (confirmarResolver) {
+      confirmarResolver(true);
+      confirmarResolver = null;
+    }
+    modalConfirmarInstance?.hide();
+  });
+
+  document.getElementById("btnConfirmarNo")?.addEventListener("click", () => {
+    if (confirmarResolver) {
+      confirmarResolver(false);
+      confirmarResolver = null;
+    }
+  });
+}
+
+function showRespuesta(message, { titulo = "Respuesta", tipo = "info" } = {}) {
+  ensureModalesMensajes();
+
+  const modalEl = document.getElementById("modalRespuesta");
+  const bodyEl = document.getElementById("modalRespuestaBody");
+  const titleEl = document.getElementById("modalRespuestaLabel");
+
+  if (!modalEl || !bodyEl) {
+    window.alert(message);
+    return;
+  }
+
+  const pasoMatch = String(message ?? "").match(/^\[([^\]]+)\]/);
+  if (pasoMatch && titulo === "Respuesta") {
+    titulo = `Error en ${pasoMatch[1]}`;
+  }
+
+  if (titleEl) titleEl.textContent = titulo;
+  bodyEl.className = `respuesta-mensaje respuesta-${tipo}`;
+  bodyEl.innerHTML = formatMensajeRespuesta(message);
+
+  modalRespuestaInstance =
+    modalRespuestaInstance || bootstrap.Modal.getOrCreateInstance(modalEl);
+  modalRespuestaInstance.show();
+}
+
+function showConfirmar(message, { titulo = "Confirmar" } = {}) {
+  ensureModalesMensajes();
+
+  const modalEl = document.getElementById("modalConfirmar");
+  const bodyEl = document.getElementById("modalConfirmarBody");
+  const titleEl = document.getElementById("modalConfirmarLabel");
+
+  if (!modalEl || !bodyEl) {
+    return Promise.resolve(window.confirm(message));
+  }
+
+  if (titleEl) titleEl.textContent = titulo;
+  bodyEl.innerHTML = formatMensajeRespuesta(message);
+
+  modalConfirmarInstance =
+    modalConfirmarInstance || bootstrap.Modal.getOrCreateInstance(modalEl);
+
+  return new Promise((resolve) => {
+    confirmarResolver = resolve;
+    modalConfirmarInstance.show();
+  });
+}
+
+function initModalesMensajes() {
+  ensureModalesMensajes();
+}
 
 /**
  * Integraciones pendientes:
@@ -41,6 +189,7 @@ const ACCORDION_IDS = ["secEmpresa", "secUsuario", "secFactura", "secItems"];
  */
 document.addEventListener("DOMContentLoaded", () => {
   migrarPerfilEmpresaLegacy();
+  initModalesMensajes();
   initSession();
   initLogin();
   initLogout();
@@ -48,6 +197,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initCambiarEmpresa();
   initMenuEnvio();
   initBuscarFactura();
+  initImprimirFactura();
   initPerfilEmpresa();
   initModalUsuario();
   applyEmpresaNombre();
@@ -386,6 +536,7 @@ function confirmarSeleccionEmpresa() {
   }
 
   modalEmpresaInstance?.hide();
+  document.dispatchEvent(new CustomEvent("fe-empresa-cambiada"));
 }
 
 function initSeleccionEmpresa() {
@@ -822,6 +973,11 @@ function setTipoEnvio(tipo) {
     ultimaConsulta = null;
     resetResultsEmpty(resultsBody, esNotaCredito);
   }
+
+  const resolucionSelect = document.getElementById("resolucion");
+  if (resolucionSelect?.value) {
+    cargarFacturasPorResolucion(resolucionSelect.value);
+  }
 }
 
 function resetResultsEmpty(container, esNotaCredito) {
@@ -891,7 +1047,11 @@ async function cargarFacturasPorResolucion(idEmpresaV) {
     '<option value="" selected disabled>Cargando facturas...</option>';
 
   try {
-    const response = await apiFetch(`/api/empresas/${idEmpresaV}/facturas`);
+    const esNotaCredito = tipoEnvioActual === "nota_credito";
+    const endpoint = esNotaCredito
+      ? `/api/empresas/${idEmpresaV}/facturas/anuladas`
+      : `/api/empresas/${idEmpresaV}/facturas`;
+    const response = await apiFetch(endpoint);
     const data = await response.json();
 
     if (!response.ok) {
@@ -899,8 +1059,9 @@ async function cargarFacturasPorResolucion(idEmpresaV) {
     }
 
     if (!data.facturas?.length) {
-      select.innerHTML =
-        '<option value="" selected disabled>No hay facturas realizadas</option>';
+      select.innerHTML = esNotaCredito
+        ? '<option value="" selected disabled>No hay facturas anuladas enviadas</option>'
+        : '<option value="" selected disabled>No hay facturas realizadas</option>';
       return;
     }
 
@@ -933,10 +1094,20 @@ async function consultarFacturaApi(numeroFactura, empresaId) {
   return data;
 }
 
+function xmlFileNameNotaCreditoHint(numeroNota, prefijoNC) {
+  const nota = String(numeroNota ?? "").trim();
+  const prefijo = String(prefijoNC ?? "").trim();
+  return nota && prefijo ? `face_${nota}${prefijo}.xml` : null;
+}
+
 function mapApiToViewModel(data, numeroFactura, numeroNotaCredito, esNotaCredito) {
   const factura = data.factura || {};
   const entidad = mergeEntidadConEdiciones(data.usuario);
   ultimaEntidadConsulta = entidad;
+  const prefijoNC = factura.prefijoNC || "";
+  const xmlFileName = esNotaCredito
+    ? xmlFileNameNotaCreditoHint(numeroNotaCredito, prefijoNC)
+    : null;
 
   return {
     empresa: data.empresa || {},
@@ -953,46 +1124,159 @@ function mapApiToViewModel(data, numeroFactura, numeroNotaCredito, esNotaCredito
     otrasRetenciones: factura.otrasRetenciones ?? 0,
     total: factura.total ?? 0,
     items: data.items || [],
+    prefijoNC,
+    xmlFileName,
     ...(esNotaCredito && numeroNotaCredito ? { numeroNotaCredito } : {}),
   };
 }
 
-async function generarXmlFacturaDesdeConsulta() {
-  if (!ultimaConsulta?.empresaId || !ultimaConsulta?.numeroFactura) {
-    window.alert("Consulte una factura antes de generar el XML.");
+async function cargarFeModoConfig() {
+  try {
+    const response = await apiFetch("/api/config/fe-modo");
+    const data = await response.json();
+    if (response.ok && data.ok) {
+      feModoConfig = {
+        facturaModo: data.facturaModo || "enviar",
+        notaCreditoModo: data.notaCreditoModo || "enviar",
+      };
+    }
+  } catch {
+    /* conservar valores por defecto */
+  }
+}
+
+function getEtiquetaBotonProcesar(esNotaCredito) {
+  const modo = esNotaCredito ? feModoConfig.notaCreditoModo : feModoConfig.facturaModo;
+  const doc = esNotaCredito ? "nota crédito" : "factura";
+  return modo === "solo_xml" ? `Generar XML ${doc}` : `Enviar ${doc} electrónica`;
+}
+
+function getHintProcesarFe(esNotaCredito) {
+  const modo = esNotaCredito ? feModoConfig.notaCreditoModo : feModoConfig.facturaModo;
+  const varName = esNotaCredito ? "FE_NOTA_CREDITO_MODO" : "FE_FACTURA_MODO";
+  if (modo === "solo_xml") {
+    return `Modo ${varName}=solo_xml: genera y guarda el XML (sin Facturatech).`;
+  }
+  return `Modo ${varName}=enviar: genera XML, envía a Facturatech y actualiza BD.`;
+}
+
+function setFeProcesarStatus(message, tipo = "info") {
+  const el = document.getElementById("feProcesarStatus");
+  if (!el) return;
+
+  if (!message) {
+    el.innerHTML = "";
+    el.className = "fe-procesar-status";
     return;
   }
 
-  const btn = document.getElementById("btnGenerarXml");
+  const alertClass =
+    tipo === "success"
+      ? "alert-success"
+      : tipo === "error"
+        ? "alert-danger"
+        : tipo === "warning"
+          ? "alert-warning"
+          : "alert-info";
+
+  el.className = "fe-procesar-status mt-2";
+  el.innerHTML = `<div class="alert ${alertClass} mb-0 text-start" role="alert">${formatMensajeRespuesta(message)}</div>`;
+}
+
+async function procesarFeDesdeConsulta() {
+  if (!ultimaConsulta?.empresaId || !ultimaConsulta?.numeroFactura) {
+    const msg =
+      "Primero presione «Buscar» y espere los resultados. Luego use «Generar XML».";
+    setFeProcesarStatus(msg, "warning");
+    showRespuesta(msg, { tipo: "warning" });
+    return;
+  }
+
+  const esNotaCredito = ultimaConsulta.esNotaCredito;
+  if (esNotaCredito && !ultimaConsulta.numeroNotaCredito) {
+    const msg = "Ingrese el número de nota crédito y vuelva a buscar.";
+    setFeProcesarStatus(msg, "warning");
+    showRespuesta(msg, { tipo: "warning" });
+    return;
+  }
+
+  const etiqueta = esNotaCredito ? "nota crédito" : "factura";
+  const modo = esNotaCredito ? feModoConfig.notaCreditoModo : feModoConfig.facturaModo;
+  const accion =
+    modo === "solo_xml"
+      ? "generar el XML"
+      : "generar el XML y enviarlo a Facturatech";
+
+  if (modo !== "solo_xml") {
+    const confirmar = await showConfirmar(
+      `Se procesará la ${etiqueta} electrónica (${accion}). ¿Desea continuar?`
+    );
+    if (!confirmar) {
+      setFeProcesarStatus("Operación cancelada.", "info");
+      return;
+    }
+  }
+
+  const btn = document.getElementById("btnProcesarFe");
   const prevText = btn?.textContent;
+  const archivoEsperado =
+    ultimaConsulta.xmlFileName ||
+    (esNotaCredito
+      ? null
+      : `face_${ultimaConsulta.numeroFactura}.xml`);
 
   if (btn) {
     btn.disabled = true;
-    btn.textContent = "Generando XML...";
+    btn.textContent = esNotaCredito ? "Generando XML..." : "Procesando...";
   }
 
-  try {
-    const { numeroFactura, empresaId } = ultimaConsulta;
-    const response = await apiFetch(
-      `/api/facturas/${encodeURIComponent(numeroFactura)}/generar-xml?empresaId=${encodeURIComponent(empresaId)}`,
-      { method: "POST" }
-    );
-    const data = await response.json();
+  setFeProcesarStatus(
+    esNotaCredito
+      ? "Generando XML de nota crédito (consulta CUFE si aplica)..."
+      : "Generando XML de factura...",
+    "info"
+  );
 
-    if (!response.ok) {
-      throw new Error(data.message || "No se pudo generar el XML");
+  try {
+    const { numeroFactura, numeroNotaCredito, empresaId, cufe } = ultimaConsulta;
+    const endpoint = esNotaCredito
+      ? `/api/notas-credito/${encodeURIComponent(numeroNotaCredito)}/enviar?empresaId=${encodeURIComponent(empresaId)}&numeroFactura=${encodeURIComponent(numeroFactura)}`
+      : `/api/facturas/${encodeURIComponent(numeroFactura)}/enviar?empresaId=${encodeURIComponent(empresaId)}`;
+
+    const response = await apiFetch(endpoint, {
+      method: "POST",
+      body: JSON.stringify(cufe ? { cufe } : {}),
+    });
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      throw new Error(
+        "Respuesta inválida del servidor. Revise la carpeta xml/ del proyecto por si el archivo ya se guardó."
+      );
     }
 
-    window.alert(
-      data.message ||
-        `XML guardado en la carpeta xml del proyecto (${data.relativePath || data.fileName}).`
-    );
+    if (!response.ok) {
+      throw new Error(data.message || "No se pudo procesar el documento");
+    }
+
+    const ruta = data.relativePath || data.fileName || archivoEsperado;
+    let mensaje = data.message || "Documento procesado correctamente.";
+    if (ruta) {
+      const nombre = String(ruta).replace(/^xml\//, "");
+      mensaje += `\n\nArchivo guardado en:\nxml/${nombre}`;
+    }
+
+    setFeProcesarStatus(mensaje, "success");
+    showRespuesta(mensaje, { tipo: "success", titulo: "XML generado" });
   } catch (error) {
-    window.alert(error.message || "Error al generar el XML.");
+    const mensaje = error.message || "Error al procesar el documento electrónico.";
+    setFeProcesarStatus(mensaje, "error");
+    showRespuesta(mensaje, { tipo: "error", titulo: "Error" });
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.textContent = prevText || "Generar XML";
+      btn.textContent = prevText || getEtiquetaBotonProcesar(esNotaCredito);
     }
   }
 }
@@ -1006,12 +1290,13 @@ function initBuscarFactura() {
   const submitBtn = form.querySelector("#btnBuscar");
 
   resultsBody?.addEventListener("click", (event) => {
-    if (event.target.closest(".btn-generar-xml")) {
+    if (event.target.closest(".btn-procesar-fe")) {
       event.preventDefault();
-      generarXmlFacturaDesdeConsulta();
+      procesarFeDesdeConsulta();
     }
   });
 
+  cargarFeModoConfig();
   cargarResoluciones();
 
   resolucionSelect?.addEventListener("change", () => {
@@ -1057,13 +1342,6 @@ function initBuscarFactura() {
       return;
     }
 
-    ultimaConsulta = {
-      numeroFactura,
-      numeroNotaCredito,
-      esNotaCredito,
-      empresaId: resolucion,
-    };
-
     const btnText = submitBtn?.querySelector("#btnBuscarText");
     const prevText = btnText?.textContent;
 
@@ -1082,8 +1360,27 @@ function initBuscarFactura() {
         numeroNotaCredito,
         esNotaCredito
       );
+      ultimaConsulta = {
+        numeroFactura,
+        numeroNotaCredito,
+        esNotaCredito,
+        empresaId: resolucion,
+        cufe: null,
+        xmlFileName:
+          datos.xmlFileName ||
+          (esNotaCredito ? null : `face_${numeroFactura}.xml`),
+      };
       renderFacturaResult(resultsBody, datos, esNotaCredito);
+      setFeProcesarStatus(
+        esNotaCredito && datos.xmlFileName
+          ? `Listo. Al generar XML se guardará en xml/${datos.xmlFileName}`
+          : esNotaCredito
+            ? "Consulta lista. Presione «Generar XML nota crédito»."
+            : `Listo. Al generar XML se guardará en xml/face_${numeroFactura}.xml`,
+        "info"
+      );
     } catch (error) {
+      ultimaConsulta = null;
       showResultsMessage(
         resultsBody,
         "warning",
@@ -1308,11 +1605,15 @@ function renderItemsSection(items, esNotaCredito) {
   return renderAccordionSection("secItems", titulo, ICONS.items, tableHtml, false);
 }
 
-function renderNotaCreditoBanner(numeroNotaCredito) {
+function renderNotaCreditoBanner(numeroNotaCredito, xmlFileName) {
+  const archivoHint = xmlFileName
+    ? `<span class="banner-hint text-muted small d-block mt-1">Archivo XML: xml/${xmlFileName}</span>`
+    : "";
   return `
     <div class="nota-credito-banner">
       <span class="banner-label">Número de nota crédito</span>
       <span class="banner-value">${numeroNotaCredito}</span>
+      ${archivoHint}
     </div>
   `;
 }
@@ -1321,20 +1622,21 @@ function renderFacturaResult(container, datos, esNotaCredito) {
   if (!container) return;
 
   const banner = esNotaCredito
-    ? renderNotaCreditoBanner(datos.numeroNotaCredito)
+    ? renderNotaCreditoBanner(datos.numeroNotaCredito, datos.xmlFileName)
     : "";
 
   const avisoIntegracion = esNotaCredito
-    ? `<p class="integracion-notice mb-3">${PENDIENTE_INTEGRAR} Consulta de nota crédito (API nota crédito pendiente). Se muestran datos de la factura asociada.</p>`
-    : "";
+    ? `<p class="integracion-notice mb-3 text-muted small">Datos de la factura anulada referenciada. El XML se guarda en la carpeta <strong>xml/</strong> del proyecto (ej. <code>xml/face_1NC.xml</code>).</p>`
+    : `<p class="integracion-notice mb-3 text-muted small">El XML se guarda en la carpeta <strong>xml/</strong> del proyecto (ej. <code>xml/face_${datos.numeroFactura}.xml</code>).</p>`;
 
-  const accionesXml = esNotaCredito
-    ? ""
-    : `<div class="results-actions mt-3 d-flex flex-wrap align-items-center gap-2">
-        <button type="button" class="btn btn-primary btn-generar-xml" id="btnGenerarXml">
-          Generar XML
-        </button>
-        <span class="text-muted small">Genera el archivo XML localmente. No envía a Facturatech/DIAN.</span>
+  const accionesXml = `<div class="results-actions mt-3">
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <button type="button" class="btn btn-primary btn-procesar-fe" id="btnProcesarFe">
+            ${getEtiquetaBotonProcesar(esNotaCredito)}
+          </button>
+          <span class="text-muted small">${getHintProcesarFe(esNotaCredito)}</span>
+        </div>
+        <div id="feProcesarStatus" class="fe-procesar-status"></div>
       </div>`;
 
   container.innerHTML = `
@@ -1374,4 +1676,245 @@ function showResultsMessage(container, type, html) {
       </div>
     </div>
   `;
+}
+
+let modalPdfFacturaInstance = null;
+let pdfPreviewBlobUrl = null;
+let pdfPreviewNumero = null;
+let pdfPreviewPrefijo = "";
+
+function limpiarPdfPreview() {
+  if (pdfPreviewBlobUrl) {
+    URL.revokeObjectURL(pdfPreviewBlobUrl);
+    pdfPreviewBlobUrl = null;
+  }
+  const frame = document.getElementById("pdfPreviewFrame");
+  if (frame) {
+    frame.removeAttribute("src");
+  }
+}
+
+async function fetchPdfFacturaBlob(numero, empresaId, disposition = "inline") {
+  const response = await apiFetch(
+    `/api/facturas/${encodeURIComponent(numero)}/pdf?empresaId=${encodeURIComponent(empresaId)}&disposition=${disposition}`
+  );
+
+  if (!response.ok) {
+    let message = "No se pudo obtener el PDF";
+    try {
+      const data = await response.json();
+      message = data.message || message;
+    } catch {
+      /* respuesta no JSON */
+    }
+    throw new Error(message);
+  }
+
+  return response.blob();
+}
+
+function descargarBlobComoPdf(blob, fileName) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+async function verPdfFactura(numero, prefijo) {
+  const empresaId = getEmpresaActivaId();
+  if (!empresaId) {
+    showRespuesta("Seleccione una empresa para continuar.", { tipo: "warning" });
+    return;
+  }
+
+  const modalEl = document.getElementById("modalPdfFactura");
+  const frame = document.getElementById("pdfPreviewFrame");
+  const title = document.getElementById("modalPdfFacturaLabel");
+  if (!modalEl || !frame) return;
+
+  if (title) {
+    title.textContent = `Factura ${prefijo}${numero}`;
+  }
+
+  limpiarPdfPreview();
+  frame.setAttribute("srcdoc", "<p style='padding:1rem;font-family:sans-serif'>Cargando PDF…</p>");
+
+  modalPdfFacturaInstance =
+    modalPdfFacturaInstance || bootstrap.Modal.getOrCreateInstance(modalEl);
+  modalPdfFacturaInstance.show();
+
+  try {
+    const blob = await fetchPdfFacturaBlob(numero, empresaId, "inline");
+    pdfPreviewNumero = numero;
+    pdfPreviewPrefijo = prefijo || "";
+    pdfPreviewBlobUrl = URL.createObjectURL(blob);
+    frame.removeAttribute("srcdoc");
+    frame.src = pdfPreviewBlobUrl;
+  } catch (error) {
+    modalPdfFacturaInstance.hide();
+    showRespuesta(error.message || "Error al cargar el PDF.", { tipo: "error", titulo: "Error" });
+  }
+}
+
+async function descargarPdfFactura(numero, prefijo) {
+  const empresaId = getEmpresaActivaId();
+  if (!empresaId) {
+    showRespuesta("Seleccione una empresa para continuar.", { tipo: "warning" });
+    return;
+  }
+
+  try {
+    const blob = await fetchPdfFacturaBlob(numero, empresaId, "attachment");
+    descargarBlobComoPdf(blob, `factura_${prefijo}${numero}.pdf`);
+  } catch (error) {
+    showRespuesta(error.message || "Error al descargar el PDF.", { tipo: "error", titulo: "Error" });
+  }
+}
+
+function renderFacturasElectronicas(container, facturas) {
+  if (!container) return;
+
+  if (!facturas.length) {
+    container.innerHTML = `
+      <div class="results-empty">
+        <p>No hay facturas electrónicas enviadas para esta empresa.</p>
+      </div>
+    `;
+    return;
+  }
+
+  const rows = facturas
+    .map(
+      (factura) => `
+      <tr>
+        <td>${factura.prefijo}${factura.numero}</td>
+        <td>${factura.numero}</td>
+        <td>${factura.prefijo || "—"}</td>
+        <td>${factura.fecha || "—"}</td>
+        <td class="fe-actions-cell">
+          <button type="button" class="btn btn-sm btn-outline-primary btn-ver-pdf" data-numero="${factura.numero}" data-prefijo="${factura.prefijo}">
+            Ver PDF
+          </button>
+          <button type="button" class="btn btn-sm btn-primary btn-descargar-pdf" data-numero="${factura.numero}" data-prefijo="${factura.prefijo}">
+            Descargar
+          </button>
+        </td>
+      </tr>
+    `
+    )
+    .join("");
+
+  container.innerHTML = `
+    <div class="items-table-wrap">
+      <table class="table items-table mb-0">
+        <thead>
+          <tr>
+            <th>Comprobante</th>
+            <th>Número</th>
+            <th>Prefijo</th>
+            <th>Fecha</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+
+  container.querySelectorAll(".btn-ver-pdf").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      verPdfFactura(btn.dataset.numero, btn.dataset.prefijo || "");
+    });
+  });
+
+  container.querySelectorAll(".btn-descargar-pdf").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      descargarPdfFactura(btn.dataset.numero, btn.dataset.prefijo || "");
+    });
+  });
+}
+
+async function cargarFacturasElectronicas() {
+  const container = document.getElementById("facturasElectronicasBody");
+  if (!container) return;
+
+  const empresaId = getEmpresaActivaId();
+  if (!empresaId) {
+    container.innerHTML = `
+      <div class="results-empty">
+        <p>Seleccione una empresa para ver las facturas enviadas.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="results-empty">
+      <p>Cargando facturas electrónicas…</p>
+    </div>
+  `;
+
+  try {
+    const response = await apiFetch(
+      `/api/empresas/${encodeURIComponent(empresaId)}/facturas/electronicas`
+    );
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "No se pudieron cargar las facturas");
+    }
+
+    renderFacturasElectronicas(container, data.facturas || []);
+  } catch (error) {
+    container.innerHTML = `
+      <div class="results-empty">
+        <p class="text-danger mb-0">${error.message || "Error al cargar facturas."}</p>
+      </div>
+    `;
+  }
+}
+
+function initImprimirFactura() {
+  if (document.body.dataset.page !== "imprimir-factura") return;
+
+  const modalEl = document.getElementById("modalPdfFactura");
+  modalEl?.addEventListener("hidden.bs.modal", limpiarPdfPreview);
+
+  document.getElementById("btnRecargarFacturasElectronicas")?.addEventListener(
+    "click",
+    cargarFacturasElectronicas
+  );
+
+  document.getElementById("btnDescargarPdfModal")?.addEventListener("click", async () => {
+    if (!pdfPreviewNumero) return;
+    try {
+      const blob = await fetchPdfFacturaBlob(
+        pdfPreviewNumero,
+        getEmpresaActivaId(),
+        "attachment"
+      );
+      descargarBlobComoPdf(
+        blob,
+        `factura_${pdfPreviewPrefijo}${pdfPreviewNumero}.pdf`
+      );
+    } catch (error) {
+      showRespuesta(error.message || "Error al descargar el PDF.", { tipo: "error", titulo: "Error" });
+    }
+  });
+
+  document.addEventListener("fe-empresa-cambiada", cargarFacturasElectronicas);
+
+  cargarEmpresasCatalogo()
+    .then(() => {
+      if (getEmpresaActivaId()) {
+        cargarFacturasElectronicas();
+      }
+    })
+    .catch(() => {
+      if (getEmpresaActivaId()) {
+        cargarFacturasElectronicas();
+      }
+    });
 }

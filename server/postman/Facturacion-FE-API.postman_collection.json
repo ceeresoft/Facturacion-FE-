@@ -1,0 +1,284 @@
+{
+  "info": {
+    "_postman_id": "facturacion-fe-api-collection",
+    "name": "Facturacion-FE — API (vía backend)",
+    "description": "Llama a las rutas del proyecto Node (`/api/...`). El backend consume Facturatech internamente (`.env`).\n\nVariables en la pestaña **Variables** de esta colección (no requiere entorno).\n\n**Orden:** Auth → Login → Factura / Nota crédito",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "if (json.token) {",
+                  "  pm.collectionVariables.set('token', json.token);",
+                  "  pm.test('Token guardado en colección', () => true);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"usuario\": \"{{usuario}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login",
+            "description": "Autenticación contra la BD. Guarda `token` en variables de la colección."
+          }
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/auth/me"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Factura electrónica",
+      "item": [
+        {
+          "name": "Listar facturas electrónicas enviadas",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/empresas/{{empresaId}}/facturas/electronicas",
+            "description": "EstadoFacturaElectronica = 1"
+          }
+        },
+        {
+          "name": "Descargar PDF factura",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/facturas/{{numeroFactura}}/pdf?empresaId={{empresaId}}&disposition=attachment",
+              "host": ["{{baseUrl}}"],
+              "path": ["facturas", "{{numeroFactura}}", "pdf"],
+              "query": [
+                { "key": "empresaId", "value": "{{empresaId}}" },
+                { "key": "disposition", "value": "attachment" }
+              ]
+            },
+            "description": "Backend llama downloadPDFFile en Facturatech."
+          }
+        },
+        {
+          "name": "Consultar factura",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/facturas/{{numeroFactura}}?empresaId={{empresaId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["facturas", "{{numeroFactura}}"],
+              "query": [
+                { "key": "empresaId", "value": "{{empresaId}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Generar XML factura",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/facturas/{{numeroFactura}}/generar-xml?empresaId={{empresaId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["facturas", "{{numeroFactura}}", "generar-xml"],
+              "query": [
+                { "key": "empresaId", "value": "{{empresaId}}" }
+              ]
+            },
+            "description": "Solo genera XML. No llama a Facturatech."
+          }
+        },
+        {
+          "name": "Enviar factura electrónica",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.transaccionID) pm.collectionVariables.set('lastTransaccionID', json.transaccionID);",
+                  "if (json.code != null) pm.collectionVariables.set('lastCode', String(json.code));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/facturas/{{numeroFactura}}/enviar?empresaId={{empresaId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["facturas", "{{numeroFactura}}", "enviar"],
+              "query": [
+                { "key": "empresaId", "value": "{{empresaId}}" }
+              ]
+            },
+            "description": "Backend: genera XML → uploadInvoiceFile → documentStatusFile."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Nota crédito electrónica",
+      "item": [
+        {
+          "name": "Generar XML nota crédito",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.cufe) pm.collectionVariables.set('cufe', json.cufe);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cufe\": \"{{cufe}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/notas-credito/{{numeroNotaCredito}}/generar-xml?empresaId={{empresaId}}&numeroFactura={{numeroFactura}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["notas-credito", "{{numeroNotaCredito}}", "generar-xml"],
+              "query": [
+                { "key": "empresaId", "value": "{{empresaId}}" },
+                { "key": "numeroFactura", "value": "{{numeroFactura}}" }
+              ]
+            },
+            "description": "Backend consulta getCUFEFile si `cufe` está vacío."
+          }
+        },
+        {
+          "name": "Enviar nota crédito electrónica",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.cufe) pm.collectionVariables.set('cufe', json.cufe);",
+                  "if (json.transaccionID) pm.collectionVariables.set('lastTransaccionID', json.transaccionID);",
+                  "if (json.code != null) pm.collectionVariables.set('lastCode', String(json.code));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cufe\": \"{{cufe}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/notas-credito/{{numeroNotaCredito}}/enviar?empresaId={{empresaId}}&numeroFactura={{numeroFactura}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["notas-credito", "{{numeroNotaCredito}}", "enviar"],
+              "query": [
+                { "key": "empresaId", "value": "{{empresaId}}" },
+                { "key": "numeroFactura", "value": "{{numeroFactura}}" }
+              ]
+            },
+            "description": "Backend: getCUFEFile → genera XML → uploadInvoiceFile → documentStatusFile."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": "{{baseUrl}}/health"
+          }
+        },
+        {
+          "name": "Health DB",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": "{{baseUrl}}/health/db"
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3005/api", "type": "string" },
+    { "key": "usuario", "value": "TU_USUARIO_BD", "type": "string" },
+    { "key": "password", "value": "TU_PASSWORD_BD", "type": "string" },
+    { "key": "token", "value": "", "type": "string" },
+    { "key": "empresaId", "value": "1", "type": "string" },
+    { "key": "numeroFactura", "value": "0800", "type": "string" },
+    { "key": "numeroNotaCredito", "value": "0001", "type": "string" },
+    { "key": "cufe", "value": "", "type": "string" },
+    { "key": "lastTransaccionID", "value": "", "type": "string" },
+    { "key": "lastCode", "value": "", "type": "string" }
+  ]
+}
