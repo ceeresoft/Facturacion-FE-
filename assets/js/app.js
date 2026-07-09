@@ -1,4 +1,5 @@
-const API_BASE_URL = "http://localhost:3005";
+const API_BASE_URL =
+  window.APP_CONFIG?.apiBaseUrl ?? "http://localhost:3005";
 const SESSION_KEY = "fe-sesion";
 const TOKEN_KEY = "fe-token";
 const USER_KEY = "fe-user";

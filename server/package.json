@@ -7,8 +7,11 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "dev": "node --watch src/index.js",
-    "start": "node src/index.js"
+    "config:frontend": "node scripts/generateFrontendConfig.js",
+    "postinstall": "node scripts/generateFrontendConfig.js",
+    "dev": "node scripts/generateFrontendConfig.js && node --watch src/index.js",
+    "start": "node scripts/generateFrontendConfig.js && node src/index.js",
+    "frontend": "node scripts/generateFrontendConfig.js && node scripts/serveFrontend.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

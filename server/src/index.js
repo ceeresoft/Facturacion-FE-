@@ -10,12 +10,13 @@ import configRoutes from "./routes/config.routes.js";
 import { handleAuthError } from "./middleware/auth.middleware.js";
 import { AuthError } from "./services/auth.service.js";
 import { FacturatechError } from "./services/envioElectronico.service.js";
+import { getApiPort, getFrontendUrl, getApiBaseUrl } from "./config/appPorts.js";
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3005;
-const corsOrigin = process.env.CORS_ORIGIN || "http://localhost:8080";
+const PORT = getApiPort();
+const corsOrigin = getFrontendUrl();
 
 function isAllowedOrigin(origin) {
   if (!origin) return true;
@@ -62,5 +63,6 @@ app.use((err, _req, res, _next) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`API escuchando en http://localhost:${PORT}`);
+  console.log(`API escuchando en ${getApiBaseUrl()}`);
+  console.log(`CORS frontend permitido: ${corsOrigin}`);
 });
