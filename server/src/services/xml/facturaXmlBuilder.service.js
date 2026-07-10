@@ -505,8 +505,11 @@ export function buildFacturaXml(datosXml) {
       datosSectorSalud.ele("SLD_3").txt("12");
     }
 
-    datosSectorSalud.ele("SLD_4").txt("0");
-    datosSectorSalud.ele("SLD_6").txt(emisor.nombreEmpresa);
+    // SLD_4 y SLD_5: solo aplican para pólizas según el Ministerio de Salud; no enviar en facturación estándar.
+    // datosSectorSalud.ele("SLD_4").txt("0");
+    // datosSectorSalud.ele("SLD_5").txt("");
+
+    datosSectorSalud.ele("SLD_6").txt("5");
   }
 
   return documento.end({ prettyPrint: true });
