@@ -509,7 +509,7 @@ export function buildFacturaXml(datosXml) {
     // datosSectorSalud.ele("SLD_4").txt("0");
     // datosSectorSalud.ele("SLD_5").txt("");
 
-    datosSectorSalud.ele("SLD_6").txt("5");
+    datosSectorSalud.ele("SLD_6").txt("05");
   }
 
   return documento.end({ prettyPrint: true });
