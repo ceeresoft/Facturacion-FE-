@@ -27,6 +27,13 @@
 import { create } from "xmlbuilder2";
 import { appendFlat, resolverCodigoMunicipioDian, txt } from "./xmlHelpers.js";
 
+function codigoMunicipioEmisor(emisor) {
+  return resolverCodigoMunicipioDian(
+    emisor.codigoCiudadEmp,
+    emisor.codigoDepartamentoEmpresa
+  );
+}
+
 function codigoMunicipioAdquiriente(adquiriente) {
   return resolverCodigoMunicipioDian(
     adquiriente.codigoCiudad,
@@ -187,12 +194,12 @@ export function buildFacturaXml(datosXml) {
     ["EMI_10", emisor.direccionEmpresa],
     ["EMI_11", emisor.codigoDepartamentoEmpresa],
     ["EMI_13", emisor.nombreCiudadEmpresa],
-    ["EMI_14", emisor.codigoCiudadEmp],
+    ["EMI_14", codigoMunicipioEmisor(emisor)],
     ["EMI_15", emisor.codigoPaisEmp],
     ["EMI_19", emisor.nombreDepartamentoEmpresa],
     ["EMI_21", emisor.nombrePaisEmp],
     ["EMI_22", emisor.digitoVerificacionEm],
-    ["EMI_23", emisor.codigoCiudadEmp],
+    ["EMI_23", codigoMunicipioEmisor(emisor)],
     ["EMI_24", emisor.nombreEmpresa],
   ]);
 
@@ -203,7 +210,7 @@ export function buildFacturaXml(datosXml) {
   // DFE: Dirección fiscal del emisor
   const direccionFiscalEmisor = bloqueEmisor.ele("DFE");
   appendFlat(direccionFiscalEmisor, [
-    ["DFE_1", emisor.codigoCiudadEmp],
+    ["DFE_1", codigoMunicipioEmisor(emisor)],
     ["DFE_2", emisor.codigoDepartamentoEmpresa],
     ["DFE_3", emisor.codigoPaisEmp],
     ["DFE_4", ""],

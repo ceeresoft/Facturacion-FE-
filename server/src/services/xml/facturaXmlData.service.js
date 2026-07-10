@@ -244,7 +244,10 @@ export async function cargarDatosXmlFactura(numero, idEmpresaV) {
       documentoVistaEmpresa,
       digitoDesdeBdEmpresa
     ),
-    codigoCiudadEmp: txt(empresaRow.codigoCiudadEmpresa),
+    codigoCiudadEmp: resolverCodigoMunicipioDian(
+      empresaRow.codigoCiudadEmpresa,
+      empresaRow.codigoDepartamentoEmpresa
+    ),
     resolucionEmpresa: txt(empresaRow.resolucionEmpresa),
     fechaIniReso: formatDateYmd(empresaRow.fechaIniResolucionEmpresa),
     fechaFinalReso: formatDateYmd(empresaRow.fechaFinalResolucionEmpresa),
