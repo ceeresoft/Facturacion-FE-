@@ -9,7 +9,10 @@ import {
   resolverCodigoMunicipioDian,
   txt,
 } from "./xmlHelpers.js";
-import { resolverDigitoVerificacionNit, normalizarDocumentoSinDigito } from "../../utils/nitDigitoVerificacion.js";
+import {
+  resolverDigitoVerificacionNit,
+  resolverDocumentoSinDigito,
+} from "../../utils/nitDigitoVerificacion.js";
 
 const NUMERO_FACTURA_WHERE = `RTRIM(CONVERT(NVARCHAR(50), NoFactura)) = RTRIM(@numero)`;
 
@@ -60,8 +63,14 @@ function normalizeEntidadXml(row) {
   const telefonoEntidad = [telefonoE, telefono2, telefonoCelular]
     .filter((t) => t != null && String(t).trim())
     .join(" ");
-  const nitBaseEntidad = normalizarDocumentoSinDigito(
-    txt(row.documentoNit) || txt(row.DocumentoEntidad)
+
+  const documentoEntidadCompleto = txt(row.DocumentoEntidad);
+  const documentoEntidadVista = txt(row.documentoNit);
+  const nitBaseEntidad = resolverDocumentoSinDigito(
+    tipoDocE,
+    documentoEntidadCompleto,
+    documentoEntidadVista,
+    row.digitoVerificacion
   );
   const departE = txt(row.CodigoDepartamentoEntidad);
   const codigoCiudad = resolverCodigoMunicipioDian(
@@ -75,7 +84,8 @@ function normalizeEntidadXml(row) {
     documentoNit: row.documentoNit,
     digitoVerificacion: resolverDigitoVerificacionNit(
       tipoDocE,
-      nitBaseEntidad,
+      documentoEntidadCompleto,
+      documentoEntidadVista,
       row.digitoVerificacion
     ),
     pNomE: row.PrimerNombreEntidad ?? "",
@@ -206,11 +216,17 @@ export async function cargarDatosXmlFactura(numero, idEmpresaV) {
     throw new FacturaError("Datos de empresa emisora no encontrados", 404);
   }
 
-  const documentoSinDigito = normalizarDocumentoSinDigito(
-    txt(empresaRow.DocumentoSinDigito) || txt(empresaRow.IdEmpresa)
-  );
-  const digitoDesdeBd =
+  const documentoCompletoEmpresa = txt(empresaRow.IdEmpresa);
+  const documentoVistaEmpresa = txt(empresaRow.DocumentoSinDigito);
+  const digitoDesdeBdEmpresa =
     empresaRow.digitoVerificacionEmpresa ?? empresaRow.digitoVerificacion;
+
+  const documentoSinDigito = resolverDocumentoSinDigito(
+    empresaRow.IdTipoDocumentoEmpresa,
+    documentoCompletoEmpresa,
+    documentoVistaEmpresa,
+    digitoDesdeBdEmpresa
+  );
 
   const empresa = {
     emailEmpresa: txt(empresaRow.EmailEmpresa) || "facturasdentotal@gmail.com",
@@ -224,8 +240,9 @@ export async function cargarDatosXmlFactura(numero, idEmpresaV) {
     nombreDepartamentoEmpresa: txt(empresaRow.DepartamentoEmpresa),
     digitoVerificacionEm: resolverDigitoVerificacionNit(
       empresaRow.IdTipoDocumentoEmpresa,
-      documentoSinDigito,
-      digitoDesdeBd
+      documentoCompletoEmpresa,
+      documentoVistaEmpresa,
+      digitoDesdeBdEmpresa
     ),
     codigoCiudadEmp: txt(empresaRow.codigoCiudadEmpresa),
     resolucionEmpresa: txt(empresaRow.resolucionEmpresa),
