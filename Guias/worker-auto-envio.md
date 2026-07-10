@@ -16,6 +16,8 @@ WORKER_ENABLED=true
 WORKER_POLL_INTERVAL_MS=60000      # intervalo entre ciclos (ms)
 WORKER_MAX_PER_CYCLE=5             # máx. facturas por ciclo
 WORKER_DELAY_BETWEEN_MS=3000       # pausa entre facturas del mismo ciclo
+WORKER_MAX_RETRIES_PER_WINDOW=2    # máx. intentos fallidos por factura
+WORKER_RETRY_WINDOW_MS=900000      # ventana de reintentos (15 min)
 ```
 
 | Variable | Default | Descripción |
@@ -24,6 +26,8 @@ WORKER_DELAY_BETWEEN_MS=3000       # pausa entre facturas del mismo ciclo
 | `WORKER_POLL_INTERVAL_MS` | `60000` | Cada cuánto consulta pendientes |
 | `WORKER_MAX_PER_CYCLE` | `5` | Límite por ciclo (máx. 50) |
 | `WORKER_DELAY_BETWEEN_MS` | `3000` | Espera entre envíos del mismo ciclo |
+| `WORKER_MAX_RETRIES_PER_WINDOW` | `2` | Máx. intentos fallidos por factura en la ventana |
+| `WORKER_RETRY_WINDOW_MS` | `900000` | Ventana de reintentos (15 minutos) |
 
 Si `FE_FACTURA_MODO=solo_xml`, el worker **no envía** (solo registra que el ciclo fue omitido).
 
@@ -54,7 +58,9 @@ Orden: fecha ascendente (las más antiguas primero).
 3. Enviar a Facturatech
 4. Actualizar `EstadoFacturaElectronica = 1`
 
-Si falla un envío, la factura queda pendiente y se reintenta en el próximo ciclo.
+Si falla un envío, la factura queda pendiente y se reintenta en el próximo ciclo, **con límite de 2 intentos fallidos cada 15 minutos por factura** (evita bloqueo del folio en Facturatech).
+
+El estado de reintentos se guarda en `server/logs/worker-retry-state.json` (persiste entre reinicios del servicio).
 
 ## Logs
 
@@ -94,6 +100,7 @@ nssm stop FacturacionFE-Worker
 | Error Facturatech | `worker-err.log`, credenciales, XML en `xml/` |
 | Error BD | `DB_*` en `.env`, permisos SQL |
 | Duplicados | Verificar que solo hay **una** instancia del worker |
+| Folio bloqueado | Revisar `WORKER_MAX_RETRIES_PER_WINDOW` y `worker-retry-state.json` |
 | Ciclo omitido | `FE_FACTURA_MODO=solo_xml` activo |
 
 ## Después de `git pull`

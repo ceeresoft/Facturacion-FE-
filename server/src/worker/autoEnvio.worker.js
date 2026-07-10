@@ -2,6 +2,13 @@ import { getModoFactura } from "../config/feModo.js";
 import { getWorkerConfig } from "../config/workerConfig.js";
 import { listarFacturasPendientesEnvio } from "../services/factura.service.js";
 import { enviarFacturaElectronica } from "../services/envioElectronico.service.js";
+import {
+  buildRetryKey,
+  clearRetryAttempts,
+  evaluateRetryLimit,
+  formatRetryWait,
+  recordFailedAttempt,
+} from "./retryTracker.js";
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -44,6 +51,20 @@ async function procesarCiclo(config) {
 
   for (const factura of pendientes) {
     const etiqueta = `factura ${factura.numero} (empresa ${factura.idEmpresaV})`;
+    const retryKey = buildRetryKey(factura.numero, factura.idEmpresaV);
+    const retryLimit = evaluateRetryLimit(retryKey, {
+      maxRetries: config.maxRetriesPerWindow,
+      windowMs: config.retryWindowMs,
+    });
+
+    if (!retryLimit.allowed) {
+      logInfo(
+        `${etiqueta} omitida: límite de ${config.maxRetriesPerWindow} intento(s) en ` +
+          `${Math.round(config.retryWindowMs / 60000)} min alcanzado. ` +
+          `Reintento en ${formatRetryWait(retryLimit.retryAfterMs)}`
+      );
+      continue;
+    }
 
     try {
       logInfo(`Enviando ${etiqueta}...`);
@@ -53,12 +74,14 @@ async function procesarCiclo(config) {
       );
 
       if (resultado.enviado) {
+        clearRetryAttempts(retryKey);
         const txId = resultado.envio?.transaccionID ?? "—";
         logInfo(`${etiqueta} enviada. transaccionID=${txId}`);
       } else {
         logInfo(`${etiqueta} procesada en modo solo_xml (sin envío)`);
       }
     } catch (error) {
+      recordFailedAttempt(retryKey, { windowMs: config.retryWindowMs });
       logError(`Fallo al enviar ${etiqueta}`, error);
     }
 
@@ -72,7 +95,7 @@ export async function runAutoEnvioWorker() {
   const config = getWorkerConfig();
 
   logInfo(
-    `Iniciando worker auto-envío (enabled=${config.enabled}, interval=${config.pollIntervalMs}ms, max=${config.maxPerCycle}, delay=${config.delayBetweenMs}ms)`
+    `Iniciando worker auto-envío (enabled=${config.enabled}, interval=${config.pollIntervalMs}ms, max=${config.maxPerCycle}, delay=${config.delayBetweenMs}ms, retries=${config.maxRetriesPerWindow}/${Math.round(config.retryWindowMs / 60000)}min)`
   );
 
   if (!config.enabled) {

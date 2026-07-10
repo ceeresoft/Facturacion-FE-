@@ -41,11 +41,21 @@ export function getWorkerDelayBetweenMs() {
   return parsePositiveInt(process.env.WORKER_DELAY_BETWEEN_MS, 3_000);
 }
 
+export function getWorkerMaxRetriesPerWindow() {
+  return parsePositiveInt(process.env.WORKER_MAX_RETRIES_PER_WINDOW, 2);
+}
+
+export function getWorkerRetryWindowMs() {
+  return parsePositiveInt(process.env.WORKER_RETRY_WINDOW_MS, 15 * 60 * 1000);
+}
+
 export function getWorkerConfig() {
   return {
     enabled: isWorkerEnabled(),
     pollIntervalMs: getWorkerPollIntervalMs(),
     maxPerCycle: getWorkerMaxPerCycle(),
     delayBetweenMs: getWorkerDelayBetweenMs(),
+    maxRetriesPerWindow: getWorkerMaxRetriesPerWindow(),
+    retryWindowMs: getWorkerRetryWindowMs(),
   };
 }
