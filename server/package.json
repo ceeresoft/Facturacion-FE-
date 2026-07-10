@@ -12,6 +12,7 @@
     "dev": "node scripts/generateFrontendConfig.js && node --watch src/index.js",
     "start": "node scripts/generateFrontendConfig.js && node src/index.js",
     "frontend": "node scripts/generateFrontendConfig.js && node scripts/serveFrontend.js",
+    "worker": "node src/worker/index.js",
     "services:install": "powershell -ExecutionPolicy Bypass -File scripts/install-nssm-services.ps1",
     "services:uninstall": "powershell -ExecutionPolicy Bypass -File scripts/uninstall-nssm-services.ps1"
   },

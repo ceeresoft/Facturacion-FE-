@@ -16,7 +16,7 @@ if (-not $nssm) {
   throw "No se encontró NSSM en PATH."
 }
 
-$services = @("FacturacionFE-API", "FacturacionFE-Web")
+$services = @("FacturacionFE-API", "FacturacionFE-Web", "FacturacionFE-Worker")
 
 foreach ($name in $services) {
   $status = & $nssm.Source status $name 2>$null

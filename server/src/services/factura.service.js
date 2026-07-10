@@ -193,6 +193,38 @@ export async function consultarFacturasAnuladasParaNotaCredito(
   }));
 }
 
+/**
+ * Facturas pendientes de envío electrónico (todas las empresas).
+ * Usado por el worker automático.
+ */
+export async function listarFacturasPendientesEnvio({ limit = 5 } = {}) {
+  const pool = await getPool();
+  const safeLimit = Math.max(1, Math.min(Number(limit) || 5, 50));
+
+  const result = await pool
+    .request()
+    .input("limit", sql.Int, safeLimit)
+    .query(`
+      SELECT TOP (@limit)
+        RTRIM(f.[No Factura]) AS numero,
+        f.[Id EmpresaV] AS idEmpresaV,
+        f.[Fecha Factura] AS fecha
+      FROM dbo.Factura AS f
+      INNER JOIN [Face Cnsta Factura] AS cf
+        ON RTRIM(cf.NroFactura) = RTRIM(f.[No Factura])
+        AND cf.IdEmpresaV = f.[Id EmpresaV]
+      WHERE f.EstadoFacturaElectronica IS NULL
+        AND f.[Id Estado] <> 5
+      ORDER BY f.[Fecha Factura] ASC
+    `);
+
+  return result.recordset.map((row) => ({
+    numero: String(row.numero ?? "").trim(),
+    idEmpresaV: Number(row.idEmpresaV),
+    fecha: row.fecha ? formatFechaDisplay(row.fecha) : null,
+  }));
+}
+
 export async function consultarFacturasElectronicasPorUsuario(
   documentoUsuario,
   idEmpresaV

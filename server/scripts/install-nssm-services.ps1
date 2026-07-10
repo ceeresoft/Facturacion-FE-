@@ -1,7 +1,7 @@
 #Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-  Instala los servicios Windows NSSM para API y frontend de Facturacion-FE.
+  Instala los servicios Windows NSSM para API, frontend y worker de Facturacion-FE.
 
 .USAGE
   PowerShell como Administrador:
@@ -20,6 +20,7 @@ $LogsDir = Join-Path $ServerDir "logs"
 
 $ServiceApi = "FacturacionFE-API"
 $ServiceWeb = "FacturacionFE-Web"
+$ServiceWorker = "FacturacionFE-Worker"
 
 function Get-EnvValue {
   param([string]$Key, [string]$Default)
@@ -101,6 +102,8 @@ $apiOut = Join-Path $LogsDir "api-out.log"
 $apiErr = Join-Path $LogsDir "api-err.log"
 $webOut = Join-Path $LogsDir "web-out.log"
 $webErr = Join-Path $LogsDir "web-err.log"
+$workerOut = Join-Path $LogsDir "worker-out.log"
+$workerErr = Join-Path $LogsDir "worker-err.log"
 
 Write-Host ""
 Write-Host "Proyecto:  $ProjectRoot"
@@ -128,8 +131,19 @@ Install-Service `
   -OutLog $webOut `
   -ErrLog $webErr
 
+Install-Service `
+  -Name $ServiceWorker `
+  -Exe $nodeExe `
+  -Args "src\worker\index.js" `
+  -WorkDir $ServerDir `
+  -DisplayName "Facturacion FE - Worker" `
+  -Description "Worker auto-envío de facturas pendientes" `
+  -OutLog $workerOut `
+  -ErrLog $workerErr
+
 Write-Host ""
 Write-Host "Servicios instalados y en ejecución."
 Write-Host "  nssm status $ServiceApi"
 Write-Host "  nssm status $ServiceWeb"
+Write-Host "  nssm status $ServiceWorker"
 Write-Host "Logs en: $LogsDir"

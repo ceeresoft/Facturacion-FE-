@@ -12,4 +12,9 @@ npm run dev
 cd "C:\Temporal\jonathan biutiful\PROYECTO FACTURACION\Facturacion-FE-"
 npx --yes serve -p 8080
 
+# Terminal 3 — worker auto-envío (opcional)
+cd "C:\Temporal\jonathan biutiful\PROYECTO FACTURACION\Facturacion-FE-\server"
+npm run worker
+
 # Producción como servicio Windows (NSSM): ver Guias/nssm-servicios.md
+# Worker automático: ver Guias/worker-auto-envio.md

@@ -1,6 +1,6 @@
 # Servicios Windows con NSSM
 
-Instala la API y el frontend como servicios de Windows para que arranquen con el servidor.
+Instala la API, el frontend y el worker de auto-envío como servicios de Windows para que arranquen con el servidor.
 
 ## Requisitos en el cliente
 
@@ -11,7 +11,7 @@ Instala la API y el frontend como servicios de Windows para que arranquen con el
 ```powershell
 cd server
 copy .env.example .env
-# Editar .env: BD, JWT, Facturatech, PORT, FRONTEND_PORT, CORS_ORIGIN
+# Editar .env: BD, JWT, Facturatech, PORT, FRONTEND_PORT, CORS_ORIGIN, WORKER_*
 npm install
 ```
 
@@ -30,6 +30,7 @@ El script:
 - Regenera `assets/js/env-config.js` desde `.env`
 - Instala **FacturacionFE-API** (`node src/index.js` en `server/`)
 - Instala **FacturacionFE-Web** (`npx serve` en la raíz del proyecto)
+- Instala **FacturacionFE-Worker** (`node src/worker/index.js` en `server/`)
 - Lee `PORT` y `FRONTEND_PORT` del `.env`
 
 ## URLs por defecto
@@ -44,12 +45,15 @@ El script:
 ```powershell
 nssm status FacturacionFE-API
 nssm status FacturacionFE-Web
+nssm status FacturacionFE-Worker
 
 nssm stop FacturacionFE-API
 nssm stop FacturacionFE-Web
+nssm stop FacturacionFE-Worker
 
 nssm start FacturacionFE-API
 nssm start FacturacionFE-Web
+nssm start FacturacionFE-Worker
 ```
 
 También desde `services.msc` (Servicios de Windows).
@@ -61,9 +65,11 @@ server/logs/api-out.log
 server/logs/api-err.log
 server/logs/web-out.log
 server/logs/web-err.log
+server/logs/worker-out.log
+server/logs/worker-err.log
 ```
 
-Si un servicio no arranca, revisa primero `api-err.log` o `web-err.log`.
+Si un servicio no arranca, revisa primero el archivo `*-err.log` correspondiente.
 
 ## Desinstalar servicios
 
@@ -84,6 +90,7 @@ npm install
 node scripts/generateFrontendConfig.js
 nssm restart FacturacionFE-API
 nssm restart FacturacionFE-Web
+nssm restart FacturacionFE-Worker
 ```
 
 ## Notas
@@ -91,3 +98,4 @@ nssm restart FacturacionFE-Web
 - Usa `npm run start` / `node src/index.js` en producción, **no** `npm run dev`.
 - `CORS_ORIGIN` en `.env` debe coincidir con la URL del frontend.
 - La cuenta del servicio (NSSM → Log on) debe tener acceso a SQL Server.
+- El worker requiere `FE_FACTURA_MODO=enviar` y `WORKER_ENABLED=true`. Ver [worker-auto-envio.md](worker-auto-envio.md).
