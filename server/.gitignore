@@ -1,3 +1,7 @@
+node_modules/
+.env
+xmls/
+
 # Logs del servicio (mantener carpeta en el repo)
 logs/*
 !logs/.gitkeep
