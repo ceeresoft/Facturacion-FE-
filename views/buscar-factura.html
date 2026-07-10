@@ -91,6 +91,26 @@
         </form>
       </div>
 
+      <div class="worker-status-card" id="workerStatusCard" aria-live="polite">
+        <div class="worker-status-header">
+          <div>
+            <h3 class="worker-status-title">Envío automático de facturas</h3>
+            <p class="worker-status-subtitle mb-0">Microservicio worker en segundo plano</p>
+          </div>
+          <span class="worker-status-badge" id="workerStatusBadge">Consultando…</span>
+        </div>
+        <p class="worker-status-message mb-2" id="workerStatusMessage">—</p>
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <button type="button" class="btn btn-sm btn-outline-primary" id="btnToggleWorker" disabled>
+            Activar worker
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="btnRefreshWorker">
+            Actualizar estado
+          </button>
+          <span class="text-muted small" id="workerStatusMeta"></span>
+        </div>
+      </div>
+
       <div class="results-card card">
         <div class="card-header" id="resultsHeader">Resultados de la consulta</div>
         <div class="card-body" id="resultsBody">

@@ -28,8 +28,32 @@ WORKER_RETRY_WINDOW_MS=900000      # ventana de reintentos (15 min)
 | `WORKER_DELAY_BETWEEN_MS` | `3000` | Espera entre envíos del mismo ciclo |
 | `WORKER_MAX_RETRIES_PER_WINDOW` | `2` | Máx. intentos fallidos por factura en la ventana |
 | `WORKER_RETRY_WINDOW_MS` | `900000` | Ventana de reintentos (15 minutos) |
+| `WORKER_DORMANT_POLL_INTERVAL_MS` | `300000` | Revisión en reposo sin BD (5 min) |
 
-Si `FE_FACTURA_MODO=solo_xml`, el worker **no envía** (solo registra que el ciclo fue omitido).
+Si `FE_FACTURA_MODO=solo_xml`, el worker **no puede activarse** y entra en reposo sin consultar la BD. Si corre con NSSM, se detiene automáticamente.
+
+## Control desde la aplicación
+
+En **Consultar factura** aparece el panel **Envío automático de facturas** con:
+
+- Estado visible: Activo / Inactivo / En reposo / Bloqueado / Apagado
+- Botón **Activar / Desactivar worker** (solo si `FE_FACTURA_MODO=enviar`)
+- El estado se actualiza cada 30 segundos
+
+La preferencia se guarda en `server/config/worker-runtime.json`.
+
+API:
+
+- `GET /api/config/worker`
+- `PUT /api/config/worker` con `{ "enabled": true|false }`
+
+## Modo reposo (sin saturar BD)
+
+Cuando el worker está inactivo o bloqueado:
+
+- **No ejecuta consultas** a SQL Server
+- Revisa configuración cada `WORKER_DORMANT_POLL_INTERVAL_MS` (default 5 min)
+- Escribe heartbeat en `server/logs/worker-heartbeat.json`
 
 ## Desarrollo local
 

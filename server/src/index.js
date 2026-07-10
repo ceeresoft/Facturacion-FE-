@@ -11,8 +11,27 @@ import { handleAuthError } from "./middleware/auth.middleware.js";
 import { AuthError } from "./services/auth.service.js";
 import { FacturatechError } from "./services/envioElectronico.service.js";
 import { getApiPort, getFrontendUrl, getApiBaseUrl } from "./config/appPorts.js";
+import { getModoFactura } from "./config/feModo.js";
+import { setWorkerRuntimeEnabled } from "./config/workerRuntime.js";
+import { controlNssmWorkerService } from "./services/workerControl.service.js";
 
 dotenv.config();
+
+async function syncWorkerOnApiBoot() {
+  if (getModoFactura() !== "solo_xml") {
+    return;
+  }
+
+  setWorkerRuntimeEnabled(false, "system");
+  const stop = await controlNssmWorkerService("stop");
+  if (stop.ok) {
+    console.log("Worker NSSM detenido al iniciar API (FE_FACTURA_MODO=solo_xml)");
+  }
+}
+
+syncWorkerOnApiBoot().catch((error) => {
+  console.warn("No se pudo sincronizar estado del worker al iniciar:", error.message);
+});
 
 const app = express();
 const PORT = getApiPort();
@@ -56,6 +75,10 @@ app.use((err, _req, res, _next) => {
     err instanceof FacturatechError
   ) {
     return res.status(err.statusCode || 400).json({ ok: false, message: err.message });
+  }
+
+  if (err?.statusCode) {
+    return res.status(err.statusCode).json({ ok: false, message: err.message });
   }
 
   console.error(err);

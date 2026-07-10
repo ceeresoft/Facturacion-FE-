@@ -32,6 +32,8 @@ let modalPerfilGuardadoInstance = null;
 let empresaSeleccionadaId = null;
 let ultimaEntidadConsulta = null;
 let feModoConfig = { facturaModo: "enviar", notaCreditoModo: "enviar" };
+let workerStatusState = null;
+let workerStatusTimer = null;
 let modalRespuestaInstance = null;
 let modalConfirmarInstance = null;
 let confirmarResolver = null;
@@ -1146,6 +1148,146 @@ async function cargarFeModoConfig() {
   }
 }
 
+function getWorkerBadgeClass(status) {
+  const map = {
+    active: "is-active",
+    inactive: "is-inactive",
+    offline: "is-offline",
+    dormant: "is-dormant",
+    blocked: "is-blocked",
+    starting: "is-starting",
+  };
+  return map[status] || "is-offline";
+}
+
+function getWorkerBadgeLabel(status) {
+  const map = {
+    active: "Activo",
+    inactive: "Inactivo",
+    offline: "Apagado",
+    dormant: "En reposo",
+    blocked: "Bloqueado",
+    starting: "Iniciando",
+  };
+  return map[status] || "Desconocido";
+}
+
+function renderWorkerStatusPanel(data) {
+  const card = document.getElementById("workerStatusCard");
+  const badge = document.getElementById("workerStatusBadge");
+  const message = document.getElementById("workerStatusMessage");
+  const meta = document.getElementById("workerStatusMeta");
+  const toggleBtn = document.getElementById("btnToggleWorker");
+
+  if (!card || !badge || !message || !toggleBtn) return;
+
+  workerStatusState = data;
+  const status = data?.effectiveStatus || "offline";
+
+  badge.className = `worker-status-badge ${getWorkerBadgeClass(status)}`;
+  badge.textContent = getWorkerBadgeLabel(status);
+  message.textContent = data?.statusLabel || "Estado no disponible";
+
+  const nssm =
+    data?.nssmStatus && data.nssmStatus !== "unknown"
+      ? `NSSM: ${data.nssmStatus}`
+      : "";
+  const modo = data?.facturaModo ? `Modo FE: ${data.facturaModo}` : "";
+  meta.textContent = [modo, nssm].filter(Boolean).join(" · ");
+
+  const canToggle = Boolean(data?.canToggle);
+  toggleBtn.disabled = !canToggle;
+
+  if (!canToggle) {
+    toggleBtn.textContent = "No disponible en solo_xml";
+    toggleBtn.className = "btn btn-sm btn-outline-secondary";
+    return;
+  }
+
+  const wantsOn = Boolean(data?.runtimeEnabled);
+  toggleBtn.textContent = wantsOn ? "Desactivar worker" : "Activar worker";
+  toggleBtn.className = wantsOn
+    ? "btn btn-sm btn-outline-danger"
+    : "btn btn-sm btn-outline-primary";
+}
+
+async function cargarWorkerStatus() {
+  const card = document.getElementById("workerStatusCard");
+  if (!card) return;
+
+  try {
+    const response = await apiFetch("/api/config/worker");
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+      throw new Error(data.message || "No se pudo consultar el worker");
+    }
+    renderWorkerStatusPanel(data);
+  } catch (error) {
+    renderWorkerStatusPanel({
+      effectiveStatus: "offline",
+      statusLabel: error.message || "No se pudo consultar el estado del worker",
+      canToggle: false,
+      facturaModo: feModoConfig.facturaModo,
+    });
+  }
+}
+
+async function toggleWorkerDesdeUi() {
+  const toggleBtn = document.getElementById("btnToggleWorker");
+  if (!toggleBtn || !workerStatusState?.canToggle) return;
+
+  const nextEnabled = !workerStatusState.runtimeEnabled;
+  toggleBtn.disabled = true;
+  toggleBtn.textContent = nextEnabled ? "Activando…" : "Desactivando…";
+
+  try {
+    const response = await apiFetch("/api/config/worker", {
+      method: "PUT",
+      body: JSON.stringify({ enabled: nextEnabled }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+      throw new Error(data.message || "No se pudo cambiar el estado del worker");
+    }
+
+    renderWorkerStatusPanel(data);
+    const nssmHint =
+      data.nssm && !data.nssm.ok
+        ? `\n\nNota NSSM: ${data.nssm.output}`
+        : "";
+    showRespuesta(
+      (data.message || "Estado actualizado") + nssmHint,
+      { tipo: data.nssm && !data.nssm.ok ? "warning" : "success" }
+    );
+  } catch (error) {
+    showRespuesta(error.message || "Error al cambiar el worker", { tipo: "error" });
+    await cargarWorkerStatus();
+  } finally {
+    if (toggleBtn && workerStatusState?.canToggle) {
+      toggleBtn.disabled = false;
+    }
+  }
+}
+
+function initWorkerStatusPanel() {
+  const card = document.getElementById("workerStatusCard");
+  if (!card) return;
+
+  document
+    .getElementById("btnToggleWorker")
+    ?.addEventListener("click", toggleWorkerDesdeUi);
+  document
+    .getElementById("btnRefreshWorker")
+    ?.addEventListener("click", cargarWorkerStatus);
+
+  cargarFeModoConfig().then(() => cargarWorkerStatus());
+
+  if (workerStatusTimer) {
+    clearInterval(workerStatusTimer);
+  }
+  workerStatusTimer = setInterval(cargarWorkerStatus, 30_000);
+}
+
 function getEtiquetaBotonProcesar(esNotaCredito) {
   const modo = esNotaCredito ? feModoConfig.notaCreditoModo : feModoConfig.facturaModo;
   const doc = esNotaCredito ? "nota crédito" : "factura";
@@ -1298,6 +1440,7 @@ function initBuscarFactura() {
   });
 
   cargarFeModoConfig();
+  initWorkerStatusPanel();
   cargarResoluciones();
 
   resolucionSelect?.addEventListener("change", () => {

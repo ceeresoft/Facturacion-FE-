@@ -48,6 +48,7 @@ $cmdExe = Require-Command "cmd"
 
 $apiPort = Get-EnvValue "PORT" "3005"
 $frontendPort = Get-EnvValue "FRONTEND_PORT" "8080"
+$facturaModo = Get-EnvValue "FE_FACTURA_MODO" "enviar"
 
 New-Item -ItemType Directory -Force -Path $LogsDir | Out-Null
 
@@ -92,6 +93,10 @@ function Install-Service {
   & $nssm set $Name AppRotateOnline 1
   & $nssm set $Name AppRotateBytes 1048576
   & $nssm set $Name Start SERVICE_AUTO_START
+
+  if ($Name -eq $ServiceWorker) {
+    & $nssm set $Name AppExit Default Exit
+  }
 
   Write-Host "Iniciando $Name..."
   & $nssm start $Name
@@ -140,6 +145,11 @@ Install-Service `
   -Description "Worker auto-envío de facturas pendientes" `
   -OutLog $workerOut `
   -ErrLog $workerErr
+
+if ($facturaModo -eq "solo_xml") {
+  Write-Host "FE_FACTURA_MODO=solo_xml — deteniendo worker (no debe ejecutarse en este modo)"
+  & $nssm stop $ServiceWorker confirm 2>$null | Out-Null
+}
 
 Write-Host ""
 Write-Host "Servicios instalados y en ejecución."

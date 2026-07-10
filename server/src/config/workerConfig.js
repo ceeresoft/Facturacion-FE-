@@ -49,10 +49,15 @@ export function getWorkerRetryWindowMs() {
   return parsePositiveInt(process.env.WORKER_RETRY_WINDOW_MS, 15 * 60 * 1000);
 }
 
+export function getWorkerDormantPollIntervalMs() {
+  return parsePositiveInt(process.env.WORKER_DORMANT_POLL_INTERVAL_MS, 5 * 60 * 1000);
+}
+
 export function getWorkerConfig() {
   return {
     enabled: isWorkerEnabled(),
     pollIntervalMs: getWorkerPollIntervalMs(),
+    dormantPollIntervalMs: getWorkerDormantPollIntervalMs(),
     maxPerCycle: getWorkerMaxPerCycle(),
     delayBetweenMs: getWorkerDelayBetweenMs(),
     maxRetriesPerWindow: getWorkerMaxRetriesPerWindow(),
