@@ -82,7 +82,7 @@ if ($LASTEXITCODE -eq 0) {
 & $nssm set $ServiceWorker AppExit Default Exit
 
 if ($facturaModo -eq "solo_xml") {
-  Write-Host "FE_FACTURA_MODO=solo_xml — el worker se deja instalado pero detenido."
+  Write-Host "FE_FACTURA_MODO=solo_xml - el worker se deja instalado pero detenido."
   & $nssm stop $ServiceWorker confirm 2>$null | Out-Null
 } else {
   Write-Host "Iniciando $ServiceWorker..."
@@ -97,4 +97,4 @@ Write-Host "  nssm restart $ServiceWorker"
 Write-Host "  nssm stop $ServiceWorker"
 Write-Host "Logs: $workerOut / $workerErr"
 Write-Host ""
-Write-Host "En la app: Consultar factura → Activar worker"
+Write-Host "En la app: Consultar factura -> Activar worker"
