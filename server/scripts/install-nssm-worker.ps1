@@ -33,7 +33,7 @@ function Require-Command {
   param([string]$Name)
   $cmd = Get-Command $Name -ErrorAction SilentlyContinue
   if (-not $cmd) {
-    throw "No se encontró '$Name' en PATH. Instálalo y vuelve a intentar."
+    throw "No se encontro '$Name' en PATH. Instalalo y vuelve a intentar."
   }
   return $cmd.Source
 }
@@ -49,19 +49,28 @@ $workerErr = Join-Path $LogsDir "worker-err.log"
 New-Item -ItemType Directory -Force -Path $LogsDir | Out-Null
 
 Write-Host ""
-Write-Host "Instalando solo el worker de auto-envío"
+Write-Host "Instalando solo el worker de auto-envio"
 Write-Host "  Servicio: $ServiceWorker"
 Write-Host "  Node:     $nodeExe"
 Write-Host "  Carpeta:  $ServerDir"
 Write-Host "  Modo FE:  $facturaModo"
 Write-Host ""
 
-$existing = & $nssm status $ServiceWorker 2>$null
-if ($LASTEXITCODE -eq 0) {
+# nssm status falla si el servicio no existe; no debe abortar el script
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = "SilentlyContinue"
+$null = & $nssm status $ServiceWorker 2>&1
+$serviceExists = ($LASTEXITCODE -eq 0)
+$ErrorActionPreference = $prevEap
+
+if ($serviceExists) {
   Write-Host "Servicio '$ServiceWorker' ya existe. Deteniendo y reconfigurando..."
-  & $nssm stop $ServiceWorker confirm 2>$null | Out-Null
+  $ErrorActionPreference = "SilentlyContinue"
+  & $nssm stop $ServiceWorker confirm 2>&1 | Out-Null
+  $ErrorActionPreference = $prevEap
   Start-Sleep -Seconds 2
 } else {
+  Write-Host "Servicio '$ServiceWorker' no existe. Instalando..."
   & $nssm install $ServiceWorker $nodeExe "src\worker\index.js"
   if ($LASTEXITCODE -ne 0) { throw "No se pudo instalar el servicio $ServiceWorker" }
 }
@@ -70,7 +79,7 @@ if ($LASTEXITCODE -eq 0) {
 & $nssm set $ServiceWorker AppDirectory $ServerDir
 & $nssm set $ServiceWorker AppParameters "src\worker\index.js"
 & $nssm set $ServiceWorker DisplayName "Facturacion FE - Worker"
-& $nssm set $ServiceWorker Description "Worker auto-envío de facturas pendientes"
+& $nssm set $ServiceWorker Description "Worker auto-envio de facturas pendientes"
 & $nssm set $ServiceWorker AppStdout $workerOut
 & $nssm set $ServiceWorker AppStderr $workerErr
 & $nssm set $ServiceWorker AppStdoutCreationDisposition 4
@@ -83,7 +92,9 @@ if ($LASTEXITCODE -eq 0) {
 
 if ($facturaModo -eq "solo_xml") {
   Write-Host "FE_FACTURA_MODO=solo_xml - el worker se deja instalado pero detenido."
-  & $nssm stop $ServiceWorker confirm 2>$null | Out-Null
+  $ErrorActionPreference = "SilentlyContinue"
+  & $nssm stop $ServiceWorker confirm 2>&1 | Out-Null
+  $ErrorActionPreference = $prevEap
 } else {
   Write-Host "Iniciando $ServiceWorker..."
   & $nssm start $ServiceWorker
@@ -91,7 +102,7 @@ if ($facturaModo -eq "solo_xml") {
 }
 
 Write-Host ""
-Write-Host "Listo. Solo se instaló el worker (API/Web existentes no se tocaron)."
+Write-Host "Listo. Solo se instalo el worker (API/Web existentes no se tocaron)."
 Write-Host "  nssm status $ServiceWorker"
 Write-Host "  nssm restart $ServiceWorker"
 Write-Host "  nssm stop $ServiceWorker"
