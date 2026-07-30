@@ -84,14 +84,14 @@ async function enterDormantMode(reason) {
 }
 
 async function procesarCiclo(config) {
-  const pendientes = await listarFacturasPendientesEnvio({
-    limit: config.maxPerCycle,
-  });
-
   writeWorkerHeartbeat({
     status: "active",
     facturaModo: getModoFactura(),
     runtimeEnabled: true,
+  });
+
+  const pendientes = await listarFacturasPendientesEnvio({
+    limit: config.maxPerCycle,
   });
 
   if (pendientes.length === 0) {
