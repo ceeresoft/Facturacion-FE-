@@ -502,7 +502,7 @@ export function buildFacturaXml(datosXml) {
     if (tipoFactura === "SS01") {
       datosSectorSalud.ele("SLD_3").txt("11");
     } else {
-      datosSectorSalud.ele("SLD_3").txt("12");
+      datosSectorSalud.ele("SLD_3").txt("15");
     }
 
     // SLD_4 y SLD_5: solo aplican para pólizas según el Ministerio de Salud; no enviar en facturación estándar.
