@@ -37,9 +37,19 @@ function Require-Command {
   param([string]$Name)
   $cmd = Get-Command $Name -ErrorAction SilentlyContinue
   if (-not $cmd) {
-    throw "No se encontró '$Name' en PATH. Instálalo y vuelve a intentar."
+    throw "No se encontro '$Name' en PATH. Instalalo y vuelve a intentar."
   }
   return $cmd.Source
+}
+
+function Test-NssmService {
+  param([string]$Name)
+  $prev = $ErrorActionPreference
+  $ErrorActionPreference = "SilentlyContinue"
+  $null = & $nssm status $Name 2>&1
+  $ok = ($LASTEXITCODE -eq 0)
+  $ErrorActionPreference = $prev
+  return $ok
 }
 
 $nssm = Require-Command "nssm"
@@ -55,7 +65,7 @@ New-Item -ItemType Directory -Force -Path $LogsDir | Out-Null
 Write-Host "Generando env-config.js del frontend..."
 Push-Location $ServerDir
 node scripts/generateFrontendConfig.js
-if ($LASTEXITCODE -ne 0) { Pop-Location; throw "Falló generateFrontendConfig.js" }
+if ($LASTEXITCODE -ne 0) { Pop-Location; throw "Fallo generateFrontendConfig.js" }
 Pop-Location
 
 function Install-Service {
@@ -70,12 +80,15 @@ function Install-Service {
     [string]$ErrLog
   )
 
-  $existing = & $nssm status $Name 2>$null
-  if ($LASTEXITCODE -eq 0) {
+  if (Test-NssmService -Name $Name) {
     Write-Host "Servicio '$Name' ya existe. Deteniendo y reconfigurando..."
-    & $nssm stop $Name confirm 2>$null | Out-Null
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = "SilentlyContinue"
+    & $nssm stop $Name confirm 2>&1 | Out-Null
+    $ErrorActionPreference = $prev
     Start-Sleep -Seconds 2
   } else {
+    Write-Host "Servicio '$Name' no existe. Instalando..."
     & $nssm install $Name $Exe $Args
     if ($LASTEXITCODE -ne 0) { throw "No se pudo instalar el servicio $Name" }
   }
@@ -122,7 +135,7 @@ Install-Service `
   -Args "src\index.js" `
   -WorkDir $ServerDir `
   -DisplayName "Facturacion FE - API" `
-  -Description "API Node.js facturación electrónica (puerto $apiPort)" `
+  -Description "API Node.js facturacion electronica (puerto $apiPort)" `
   -OutLog $apiOut `
   -ErrLog $apiErr
 
@@ -132,7 +145,7 @@ Install-Service `
   -Args "/c npx --yes serve -p $frontendPort" `
   -WorkDir $ProjectRoot `
   -DisplayName "Facturacion FE - Web" `
-  -Description "Frontend estático facturación electrónica (puerto $frontendPort)" `
+  -Description "Frontend estatico facturacion electronica (puerto $frontendPort)" `
   -OutLog $webOut `
   -ErrLog $webErr
 
@@ -142,17 +155,20 @@ Install-Service `
   -Args "src\worker\index.js" `
   -WorkDir $ServerDir `
   -DisplayName "Facturacion FE - Worker" `
-  -Description "Worker auto-envío de facturas pendientes" `
+  -Description "Worker auto-envio de facturas pendientes" `
   -OutLog $workerOut `
   -ErrLog $workerErr
 
 if ($facturaModo -eq "solo_xml") {
-  Write-Host "FE_FACTURA_MODO=solo_xml — deteniendo worker (no debe ejecutarse en este modo)"
-  & $nssm stop $ServiceWorker confirm 2>$null | Out-Null
+  Write-Host "FE_FACTURA_MODO=solo_xml - deteniendo worker (no debe ejecutarse en este modo)"
+  $prev = $ErrorActionPreference
+  $ErrorActionPreference = "SilentlyContinue"
+  & $nssm stop $ServiceWorker confirm 2>&1 | Out-Null
+  $ErrorActionPreference = $prev
 }
 
 Write-Host ""
-Write-Host "Servicios instalados y en ejecución."
+Write-Host "Servicios instalados y en ejecucion."
 Write-Host "  nssm status $ServiceApi"
 Write-Host "  nssm status $ServiceWeb"
 Write-Host "  nssm status $ServiceWorker"
