@@ -16,17 +16,24 @@ function soloDigitos(value) {
 }
 
 /**
- * Limpia el documento: quita espacios y guiones finales (ej. 71668114-).
+ * Limpia el documento: quita espacios, guiones finales (ej. 71668114-)
+ * y sufijo NIT-DV (ej. 71709046-1 → 71709046) para ENC_2 / EMI_2.
  */
 export function normalizarDocumentoSinDigito(value) {
-  return limpiarTexto(value).replace(/-+$/, "");
+  let s = limpiarTexto(value).replace(/-+$/, "");
+  const conGuionYDv = s.match(/^([\d.\s]+)\s*-\s*(\d)$/);
+  if (conGuionYDv) {
+    return soloDigitos(conGuionYDv[1]);
+  }
+  return s;
 }
 
 /**
  * Separa NIT base y DV según tipo DIAN y formatos habituales en BD.
  *
  * NIT (31): 900063460-1, 900063460-, 900063460, 9000634601+DV en columna aparte.
- * Otros tipos: documento completo sin quitar dígito de verificación (no aplica DV NIT).
+ * Otros tipos: documento completo sin quitar dígito de verificación (no aplica DV NIT),
+ * excepto si el valor trae sufijo -DV (se remueve para no mandarlo en ENC_2/EMI_2).
  */
 export function extraerComponentesDocumento(
   tipoDocumentoDian,
@@ -39,24 +46,24 @@ export function extraerComponentesDocumento(
   const vista = limpiarTexto(documentoDesdeVista);
   const dvBd = limpiarTexto(digitoDesdeBd);
 
-  if (tipo !== CODIGO_DIAN_NIT) {
-    const raw = completo || vista;
-    return {
-      base: normalizarDocumentoSinDigito(raw),
-      dv: "",
-    };
-  }
-
   const fuente = completo || vista;
   if (!fuente) {
-    return { base: "", dv: dvBd };
+    return { base: "", dv: tipo === CODIGO_DIAN_NIT ? dvBd : "" };
   }
 
-  const conGuionYDv = fuente.match(/^([\d.\s]+)-(\d)$/);
+  // Formato NIT-DV (ej. 71709046-1): base sin guion ni digito de verificacion.
+  const conGuionYDv = fuente.match(/^([\d.\s]+)\s*-\s*(\d)$/);
   if (conGuionYDv) {
     return {
       base: soloDigitos(conGuionYDv[1]),
       dv: conGuionYDv[2],
+    };
+  }
+
+  if (tipo !== CODIGO_DIAN_NIT) {
+    return {
+      base: normalizarDocumentoSinDigito(fuente),
+      dv: "",
     };
   }
 
