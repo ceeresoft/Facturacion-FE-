@@ -1,5 +1,5 @@
-﻿/**
- * D├¡gito de verificaci├│n NIT (Colombia / DIAN), algoritmo m├│dulo 11.
+/**
+ * Dígito de verificación NIT (Colombia / DIAN), algoritmo módulo 11.
  * Solo aplica cuando el tipo de documento DIAN es 31 (NIT).
  */
 
@@ -23,10 +23,10 @@ export function normalizarDocumentoSinDigito(value) {
 }
 
 /**
- * Separa NIT base y DV seg├║n tipo DIAN y formatos habituales en BD.
+ * Separa NIT base y DV según tipo DIAN y formatos habituales en BD.
  *
  * NIT (31): 900063460-1, 900063460-, 900063460, 9000634601+DV en columna aparte.
- * Otros tipos: documento completo sin quitar d├¡gito de verificaci├│n (no aplica DV NIT).
+ * Otros tipos: documento completo sin quitar dígito de verificación (no aplica DV NIT).
  */
 export function extraerComponentesDocumento(
   tipoDocumentoDian,
@@ -92,7 +92,7 @@ export function extraerComponentesDocumento(
 }
 
 /**
- * Documento para EMI_2 / ENC_2 / ADQ_2 sin d├¡gito de verificaci├│n NIT.
+ * Documento para EMI_2 / ENC_2 / ADQ_2 sin dígito de verificación NIT.
  */
 export function resolverDocumentoSinDigito(
   tipoDocumentoDian,
@@ -126,7 +126,7 @@ export function calcularDigitoVerificacionNit(nitBase) {
 }
 
 /**
- * DV para EMI_22: desde BD, gui├│n NIT-DV, o c├ílculo DIAN si es NIT y falta.
+ * DV para EMI_22: desde BD, guión NIT-DV, o cálculo DIAN si es NIT y falta.
  */
 export function resolverDigitoVerificacionNit(
   tipoDocumentoDian,
