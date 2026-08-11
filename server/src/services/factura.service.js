@@ -199,7 +199,7 @@ export async function consultarFacturasAnuladasParaNotaCredito(
  */
 export async function listarFacturasPendientesEnvio({ limit = 5 } = {}) {
   const pool = await getPool();
-  const safeLimit = Math.max(1, Math.min(Number(limit) || 5, 50));
+  const safeLimit = Math.max(1, Math.min(Number(limit) || 5, 200));
 
   const result = await pool
     .request()

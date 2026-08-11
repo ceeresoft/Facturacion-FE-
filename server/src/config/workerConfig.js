@@ -37,6 +37,13 @@ export function getWorkerMaxPerCycle() {
   return parsePositiveInt(process.env.WORKER_MAX_PER_CYCLE, 5);
 }
 
+/** Cuántas pendientes se leen de BD para saltar las que están en cooldown. */
+export function getWorkerCandidateLimit() {
+  const maxPerCycle = getWorkerMaxPerCycle();
+  const configured = parsePositiveInt(process.env.WORKER_CANDIDATE_LIMIT, 50);
+  return Math.max(maxPerCycle, Math.min(configured, 200));
+}
+
 export function getWorkerDelayBetweenMs() {
   return parsePositiveInt(process.env.WORKER_DELAY_BETWEEN_MS, 3_000);
 }
@@ -59,6 +66,7 @@ export function getWorkerConfig() {
     pollIntervalMs: getWorkerPollIntervalMs(),
     dormantPollIntervalMs: getWorkerDormantPollIntervalMs(),
     maxPerCycle: getWorkerMaxPerCycle(),
+    candidateLimit: getWorkerCandidateLimit(),
     delayBetweenMs: getWorkerDelayBetweenMs(),
     maxRetriesPerWindow: getWorkerMaxRetriesPerWindow(),
     retryWindowMs: getWorkerRetryWindowMs(),
