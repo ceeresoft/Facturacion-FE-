@@ -16,17 +16,24 @@ function soloDigitos(value) {
 }
 
 /**
- * Limpia el documento: quita espacios y guiones finales (ej. 71668114-).
+ * Limpia el documento: quita espacios, guiones finales (ej. 71668114-)
+ * y sufijo NIT-DV (ej. 71709046-1 → 71709046) para ENC_2 / EMI_2.
+ * El DV no va pegado al documento; va en EMI_22.
  */
 export function normalizarDocumentoSinDigito(value) {
-  return limpiarTexto(value).replace(/-+$/, "");
+  let s = limpiarTexto(value).replace(/-+$/, "");
+  const conGuionYDv = s.match(/^([\d.\s]+)\s*-\s*(\d)$/);
+  if (conGuionYDv) {
+    return soloDigitos(conGuionYDv[1]);
+  }
+  return s;
 }
 
 /**
  * Separa NIT base y DV según tipo DIAN y formatos habituales en BD.
  *
  * NIT (31): 900063460-1, 900063460-, 900063460, 9000634601+DV en columna aparte.
- * Otros tipos: documento completo sin quitar dígito de verificación (no aplica DV NIT).
+ * Otros tipos: documento sin DV NIT, excepto si trae sufijo -DV (se separa).
  */
 export function extraerComponentesDocumento(
   tipoDocumentoDian,
@@ -39,24 +46,24 @@ export function extraerComponentesDocumento(
   const vista = limpiarTexto(documentoDesdeVista);
   const dvBd = limpiarTexto(digitoDesdeBd);
 
-  if (tipo !== CODIGO_DIAN_NIT) {
-    const raw = completo || vista;
-    return {
-      base: normalizarDocumentoSinDigito(raw),
-      dv: "",
-    };
-  }
-
   const fuente = completo || vista;
   if (!fuente) {
     return { base: "", dv: dvBd };
   }
 
-  const conGuionYDv = fuente.match(/^([\d.\s]+)-(\d)$/);
+  // Formato NIT-DV (ej. 71709046-1): base sin guion; DV aparte.
+  const conGuionYDv = fuente.match(/^([\d.\s]+)\s*-\s*(\d)$/);
   if (conGuionYDv) {
     return {
       base: soloDigitos(conGuionYDv[1]),
-      dv: conGuionYDv[2],
+      dv: conGuionYDv[2] || dvBd,
+    };
+  }
+
+  if (tipo !== CODIGO_DIAN_NIT) {
+    return {
+      base: normalizarDocumentoSinDigito(fuente),
+      dv: dvBd,
     };
   }
 
@@ -126,7 +133,8 @@ export function calcularDigitoVerificacionNit(nitBase) {
 }
 
 /**
- * DV para EMI_22: desde BD, guión NIT-DV, o cálculo DIAN si es NIT y falta.
+ * DV para EMI_22: desde BD / guión NIT-DV, o cálculo módulo 11 si falta.
+ * Aplica a NIT (31) o documento numérico de empresa (>= 6 dígitos).
  */
 export function resolverDigitoVerificacionNit(
   tipoDocumentoDian,
@@ -135,10 +143,6 @@ export function resolverDigitoVerificacionNit(
   digitoDesdeBd = ""
 ) {
   const tipo = Number(tipoDocumentoDian);
-  if (tipo !== CODIGO_DIAN_NIT) {
-    return limpiarTexto(digitoDesdeBd);
-  }
-
   const { base, dv } = extraerComponentesDocumento(
     tipoDocumentoDian,
     documentoCompleto,
@@ -150,8 +154,17 @@ export function resolverDigitoVerificacionNit(
     return dv;
   }
 
-  if (base) {
-    return calcularDigitoVerificacionNit(base);
+  const digitoBd = limpiarTexto(digitoDesdeBd);
+  if (digitoBd) {
+    return digitoBd;
+  }
+
+  const baseDigitos = soloDigitos(base);
+  const pareceNit =
+    tipo === CODIGO_DIAN_NIT || baseDigitos.length >= 6;
+
+  if (pareceNit && baseDigitos) {
+    return calcularDigitoVerificacionNit(baseDigitos);
   }
 
   return "";
