@@ -565,7 +565,7 @@ SELECT DISTINCT TOP (100) PERCENT
   CASE WHEN SUM(cpit.[Valor de Cuota Cuotas Pactadas Inicial Tratamiento]) IS NULL THEN 0 ELSE SUM(cpit.[Valor de Cuota Cuotas Pactadas Inicial Tratamiento]) END AS Copagos,
   CASE
     WHEN fc.[Documento Responsable] <> pl.[Documento Responsable] THEN 'SS07'
-    WHEN SUM(cpit.[Valor de Cuota Cuotas Pactadas Inicial Tratamiento]) IS NULL THEN 'SS06'
+    WHEN fc.[Documento Responsable] = pl.[Documento Responsable] THEN 'SS06'
     ELSE 'SS01'
   END AS TipoFactura
 FROM dbo.[Plan de Tratamiento Tratamientos] AS pl
