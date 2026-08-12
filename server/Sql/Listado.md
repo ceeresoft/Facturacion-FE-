@@ -1,6 +1,14 @@
 # Objetos SQL usados por Facturacion-FE
 
-Fuente: servicios en `server/src`. Definiciones guardadas en `Creates.sql` (extraídas 2026-07-08).
+Fuente: servicios en `server/src`. Definiciones guardadas en `sqlcripts.sql` (extraídas 2026-07-08).
+
+## Scripts de instalación
+
+| Archivo | Cuándo usarlo |
+|---------|----------------|
+| `sqlcripts.sql` | Referencia / BD nueva (CREATE puro) |
+| `instalar-o-actualizar.sql` | **BD existente con Face PHP** — tablas CREATE si faltan, vistas CREATE OR ALTER |
+| `node scripts/generateInstalarOActualizarSql.js` | Regenerar `instalar-o-actualizar.sql` desde `sqlcripts.sql` |
 
 ## Estado en esta base
 
