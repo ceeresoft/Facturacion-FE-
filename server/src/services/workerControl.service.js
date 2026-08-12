@@ -11,24 +11,92 @@ import { readWorkerHeartbeat } from "../worker/workerHeartbeat.js";
 
 const execAsync = promisify(exec);
 const SERVICE_NAME = process.env.WORKER_NSSM_SERVICE_NAME || "FacturacionFE-Worker";
+const SC_EXE = process.env.SC_EXE || "C:\\Windows\\System32\\sc.exe";
+const NSSM_EXE = process.env.NSSM_EXE?.trim() || "";
+
+function mapScState(stdout) {
+  const text = String(stdout);
+  if (/STATE\s+:\s+\d+\s+RUNNING/i.test(text)) return "SERVICE_RUNNING";
+  if (/STATE\s+:\s+\d+\s+STOPPED/i.test(text)) return "SERVICE_STOPPED";
+  if (/STATE\s+:\s+\d+\s+START_PENDING/i.test(text)) return "SERVICE_START_PENDING";
+  if (/STATE\s+:\s+\d+\s+STOP_PENDING/i.test(text)) return "SERVICE_STOP_PENDING";
+  return text.trim() || "unknown";
+}
+
+function isBenignScError(action, error) {
+  const message = String(error?.message || error?.stderr || error?.stdout || "");
+  if (action === "start" && /1056|already running|ya se est[aá] ejecutando/i.test(message)) {
+    return true;
+  }
+  if (action === "stop" && /1062|has not been started|no se ha iniciado/i.test(message)) {
+    return true;
+  }
+  return false;
+}
+
+async function runSc(action) {
+  const quotedSc = `"${SC_EXE}"`;
+  const quotedService = `"${SERVICE_NAME}"`;
+  const command =
+    action === "query"
+      ? `${quotedSc} query ${quotedService}`
+      : `${quotedSc} ${action} ${quotedService}`;
+  const { stdout, stderr } = await execAsync(command);
+  return String(stdout || stderr || "").trim();
+}
+
+async function runNssm(action) {
+  if (!NSSM_EXE) {
+    throw new Error("NSSM_EXE no configurado");
+  }
+  const quotedNssm = `"${NSSM_EXE}"`;
+  const quotedService = `"${SERVICE_NAME}"`;
+  const command =
+    action === "query"
+      ? `${quotedNssm} status ${quotedService}`
+      : `${quotedNssm} ${action} ${quotedService}`;
+  const { stdout, stderr } = await execAsync(command);
+  return String(stdout || stderr || "").trim();
+}
 
 export async function getNssmServiceStatus() {
   try {
-    const { stdout } = await execAsync(`nssm status ${SERVICE_NAME}`);
-    return String(stdout).trim();
+    const output = await runSc("query");
+    return mapScState(output);
   } catch {
-    return "unknown";
+    if (!NSSM_EXE) return "unknown";
+    try {
+      return (await runNssm("query")).trim() || "unknown";
+    } catch {
+      return "unknown";
+    }
   }
 }
 
 export async function controlNssmWorkerService(action) {
   try {
-    const { stdout } = await execAsync(`nssm ${action} ${SERVICE_NAME}`);
-    return { ok: true, output: String(stdout).trim() };
+    const output = await runSc(action);
+    return { ok: true, output };
   } catch (error) {
+    if (isBenignScError(action, error)) {
+      return { ok: true, output: String(error?.message || error).trim() };
+    }
+
+    if (NSSM_EXE) {
+      try {
+        const output = await runNssm(action);
+        return { ok: true, output };
+      } catch (nssmError) {
+        return {
+          ok: false,
+          output: nssmError?.message || `No se pudo controlar el servicio ${SERVICE_NAME}`,
+        };
+      }
+    }
+
     return {
       ok: false,
-      output: error?.message || `No se pudo ejecutar nssm ${action}`,
+      output: error?.message || `No se pudo ejecutar sc ${action}`,
     };
   }
 }
