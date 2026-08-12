@@ -38,6 +38,18 @@ function Require-Command {
   return $cmd.Source
 }
 
+function Set-NssmAppParameters {
+  param(
+    [string]$Nssm,
+    [string]$ServiceName,
+    [string]$AppParameters
+  )
+  & $Nssm set $ServiceName AppParameters $AppParameters
+  if ($LASTEXITCODE -ne 0) {
+    throw "No se pudo setear AppParameters en $ServiceName"
+  }
+}
+
 $nssm = Require-Command "nssm"
 $nodeExe = Require-Command "node"
 
@@ -77,7 +89,7 @@ if ($serviceExists) {
 
 & $nssm set $ServiceWorker Application $nodeExe
 & $nssm set $ServiceWorker AppDirectory $ServerDir
-& $nssm set $ServiceWorker AppParameters "src\worker\index.js"
+Set-NssmAppParameters -Nssm $nssm -ServiceName $ServiceWorker -AppParameters "src\worker\index.js"
 & $nssm set $ServiceWorker DisplayName "Facturacion FE - Worker"
 & $nssm set $ServiceWorker Description "Worker auto-envio de facturas pendientes"
 & $nssm set $ServiceWorker AppStdout $workerOut

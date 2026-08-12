@@ -68,11 +68,23 @@ node scripts/generateFrontendConfig.js
 if ($LASTEXITCODE -ne 0) { Pop-Location; throw "Fallo generateFrontendConfig.js" }
 Pop-Location
 
+function Set-NssmAppParameters {
+  param(
+    [string]$Nssm,
+    [string]$ServiceName,
+    [string]$AppParameters
+  )
+  & $Nssm set $ServiceName AppParameters $AppParameters
+  if ($LASTEXITCODE -ne 0) {
+    throw "No se pudo setear AppParameters en $ServiceName"
+  }
+}
+
 function Install-Service {
   param(
     [string]$Name,
     [string]$Exe,
-    [string]$Args,
+    [string]$AppArgs,
     [string]$WorkDir,
     [string]$DisplayName,
     [string]$Description,
@@ -89,13 +101,13 @@ function Install-Service {
     Start-Sleep -Seconds 2
   } else {
     Write-Host "Servicio '$Name' no existe. Instalando..."
-    & $nssm install $Name $Exe $Args
+    & $nssm install $Name $Exe $AppArgs
     if ($LASTEXITCODE -ne 0) { throw "No se pudo instalar el servicio $Name" }
   }
 
   & $nssm set $Name Application $Exe
   & $nssm set $Name AppDirectory $WorkDir
-  & $nssm set $Name AppParameters $Args
+  Set-NssmAppParameters -Nssm $nssm -ServiceName $Name -AppParameters $AppArgs
   & $nssm set $Name DisplayName $DisplayName
   & $nssm set $Name Description $Description
   & $nssm set $Name AppStdout $OutLog
@@ -132,7 +144,7 @@ Write-Host ""
 Install-Service `
   -Name $ServiceApi `
   -Exe $nodeExe `
-  -Args "src\index.js" `
+  -AppArgs "src\index.js" `
   -WorkDir $ServerDir `
   -DisplayName "Facturacion FE - API" `
   -Description "API Node.js facturacion electronica (puerto $apiPort)" `
@@ -142,7 +154,7 @@ Install-Service `
 Install-Service `
   -Name $ServiceWeb `
   -Exe $cmdExe `
-  -Args "/c npx --yes serve -p $frontendPort" `
+  -AppArgs "/c npx --yes serve -p $frontendPort" `
   -WorkDir $ProjectRoot `
   -DisplayName "Facturacion FE - Web" `
   -Description "Frontend estatico facturacion electronica (puerto $frontendPort)" `
@@ -152,7 +164,7 @@ Install-Service `
 Install-Service `
   -Name $ServiceWorker `
   -Exe $nodeExe `
-  -Args "src\worker\index.js" `
+  -AppArgs "src\worker\index.js" `
   -WorkDir $ServerDir `
   -DisplayName "Facturacion FE - Worker" `
   -Description "Worker auto-envio de facturas pendientes" `
