@@ -1,5 +1,6 @@
 import { getPool, sql } from "../../config/db.js";
 import { FacturaError } from "../factura.service.js";
+import { resolveEmailConFallback } from "../../utils/format.js";
 import { resolveDetailTableForXml } from "./resolveDetailTableXml.js";
 import {
   formatDateYmd,
@@ -42,13 +43,10 @@ async function queryOne(pool, query, inputs = []) {
   return rows[0] ?? null;
 }
 
-function normalizeEntidadXml(row) {
+function normalizeEntidadXml(row, emailEmpresaFallback = "") {
   if (!row) return null;
 
-  let email = row.EmailEntidad;
-  if (email == null || String(email).trim() === "" || email === " ") {
-    email = "facturasdentotal@gmail.com";
-  }
+  const email = resolveEmailConFallback(row.EmailEntidad, emailEmpresaFallback);
 
   let regimen = row.regimenEntidad;
   if (regimen === "1" || regimen == null) regimen = "0";
@@ -228,8 +226,10 @@ export async function cargarDatosXmlFactura(numero, idEmpresaV) {
     digitoDesdeBdEmpresa
   );
 
+  const emailEmpresa = txt(empresaRow.EmailEmpresa);
+
   const empresa = {
-    emailEmpresa: txt(empresaRow.EmailEmpresa) || "facturasdentotal@gmail.com",
+    emailEmpresa,
     documentoSinDigito,
     tipoDocumentoEmpresa: empresaRow.IdTipoDocumentoEmpresa,
     nombreEmpresa: txt(empresaRow.NombreEmpresa),
@@ -264,7 +264,8 @@ export async function cargarDatosXmlFactura(numero, idEmpresaV) {
       `SELECT * FROM [Face Cnsta FacturaE Entidad]
        WHERE RTRIM(NroFactura) = RTRIM(@numero) AND IdEmpresaV = @idEmpresaV`,
       params
-    )
+    ),
+    emailEmpresa
   );
 
   if (!entidad) {

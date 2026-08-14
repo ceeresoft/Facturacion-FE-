@@ -1,3 +1,9 @@
+export function resolveEmailConFallback(emailPrincipal, emailFallback) {
+  const principal = String(emailPrincipal ?? "").trim();
+  if (principal) return principal;
+  return String(emailFallback ?? "").trim();
+}
+
 export function formatFechaDisplay(value) {
   if (!value) return "—";
   const date = value instanceof Date ? value : new Date(value);

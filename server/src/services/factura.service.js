@@ -5,6 +5,7 @@ import {
   formatFechaDisplay,
   mapMedioPago,
   mapItemRow,
+  resolveEmailConFallback,
 } from "../utils/format.js";
 
 export class FacturaError extends Error {
@@ -23,7 +24,7 @@ const DETAIL_TABLES = new Set([
   "[Face Cnsta FacturaEII]",
 ]);
 
-function normalizeEntidad(row) {
+function normalizeEntidad(row, emailEmpresaFallback = "") {
   if (!row) return null;
 
   let segundoNombre = row.SegundoNombreEntidad ?? "";
@@ -32,10 +33,7 @@ function normalizeEntidad(row) {
   let regimen = row.regimenEntidad ?? "";
   if (regimen == null) regimen = "0";
 
-  let email = row.EmailEntidad ?? "";
-  if (email == null || String(email).trim() === "") {
-    email = "facturasdentotal@gmail.com";
-  }
+  const email = resolveEmailConFallback(row.EmailEntidad, emailEmpresaFallback);
 
   let telefono = row.Telefono1Entidad;
   const telefono2 = row.Telefono2Entidad;
@@ -463,9 +461,12 @@ export async function consultaFacturaCompleta(numero, idEmpresaV) {
     consultaDetalleItems(pool, numeroLimpio, idEmpresaV),
   ]);
 
+  const empresa = normalizeEmpresa(empresaRow);
+  const emailEmpresaFallback = empresa?.email ?? empresaRow?.EmailEmpresa ?? "";
+
   return {
-    empresa: normalizeEmpresa(empresaRow),
-    usuario: normalizeEntidad(entidadRow),
+    empresa,
+    usuario: normalizeEntidad(entidadRow, emailEmpresaFallback),
     factura: normalizeFacturaHeader(header),
     items,
   };
