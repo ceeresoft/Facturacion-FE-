@@ -8,6 +8,7 @@ import {
   formatTimeHms,
   mapFormaPagoXml,
   resolverCodigoMunicipioDian,
+  folioSinCerosIzquierda,
   txt,
 } from "./xmlHelpers.js";
 import {
@@ -168,7 +169,7 @@ export async function cargarDatosXmlFactura(numero, idEmpresaV) {
   const fechaVencimiento = facturaRow.FechaVencimientoFactura;
 
   const factura = {
-    numF: txt(facturaRow.NroFactura).trim(),
+    numF: folioSinCerosIzquierda(facturaRow.NroFactura),
     prefijoF: txt(facturaRow.PrefijoFactura),
     fechaF: formatDateYmd(fechaFactura),
     fechaF2: formatDateTimeIso(fechaFactura),

@@ -4,6 +4,16 @@ export function txt(value) {
 }
 
 /**
+ * Quita ceros a la izquierda del folio (0005001 → 5001) para Facturatech/DIAN.
+ * Si no es un número entero, deja el valor original.
+ */
+export function folioSinCerosIzquierda(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw || !/^\d+$/.test(raw)) return raw;
+  return String(Number(raw));
+}
+
+/**
  * Código municipio DANE (5 dígitos: depto + ciudad).
  * Si la ciudad trae menos de 5 dígitos (ej. 001), antepone el departamento (ej. 05 → 05001).
  */

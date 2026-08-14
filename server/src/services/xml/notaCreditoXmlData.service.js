@@ -2,7 +2,7 @@ import { getPool, sql } from "../../config/db.js";
 import { FacturaError } from "../factura.service.js";
 import { cargarDatosXmlFactura } from "./facturaXmlData.service.js";
 import { obtenerCufeFactura } from "../facturatech.service.js";
-import { formatDateYmd, txt } from "./xmlHelpers.js";
+import { formatDateYmd, folioSinCerosIzquierda, txt } from "./xmlHelpers.js";
 import { ejecutarPaso, mensajePaso } from "../../utils/feStepError.js";
 
 async function validarEmpresaFactura(pool, numeroFactura, empresaId) {
@@ -136,7 +136,7 @@ export async function cargarDatosXmlNotaCredito(
   return {
     ...datosFactura,
     notaCredito: {
-      numNC: numeroNotaLimpio,
+      numNC: folioSinCerosIzquierda(numeroNotaLimpio),
       prefijoNC: txt(ncMeta.PrefijoNC),
       resolucionNC: txt(ncMeta.ResolucionNC),
       fechaResolNC: formatDateYmd(ncMeta.FechaResolucionNC),
