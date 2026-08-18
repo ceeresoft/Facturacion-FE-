@@ -1,3 +1,7 @@
 # XML generados (mantener carpeta en el repo)
 xml/*
 !xml/.gitkeep
+
+node_modules/
+dist/
+release/

@@ -54,19 +54,24 @@ function Test-NssmService {
 
 $nssm = Require-Command "nssm"
 $nodeExe = Require-Command "node"
-$cmdExe = Require-Command "cmd"
 
 $apiPort = Get-EnvValue "PORT" "3005"
-$frontendPort = Get-EnvValue "FRONTEND_PORT" "8080"
 $facturaModo = Get-EnvValue "FE_FACTURA_MODO" "enviar"
 
 New-Item -ItemType Directory -Force -Path $LogsDir | Out-Null
 
-Write-Host "Generando env-config.js del frontend..."
-Push-Location $ServerDir
-node scripts/generateFrontendConfig.js
-if ($LASTEXITCODE -ne 0) { Pop-Location; throw "Fallo generateFrontendConfig.js" }
+Write-Host "Compilando frontend (Vite -> dist/)..."
+Push-Location $ProjectRoot
+npm install
+if ($LASTEXITCODE -ne 0) { Pop-Location; throw "Fallo npm install en la raiz del repo" }
+npm run build
+if ($LASTEXITCODE -ne 0) { Pop-Location; throw "Fallo npm run build (Vite)" }
 Pop-Location
+
+$distIndex = Join-Path $ProjectRoot "dist\index.html"
+if (-not (Test-Path $distIndex)) {
+  throw "No se genero dist/index.html. Revisa npm run build."
+}
 
 function Set-NssmAppParameters {
   param(
@@ -130,15 +135,12 @@ function Install-Service {
 
 $apiOut = Join-Path $LogsDir "api-out.log"
 $apiErr = Join-Path $LogsDir "api-err.log"
-$webOut = Join-Path $LogsDir "web-out.log"
-$webErr = Join-Path $LogsDir "web-err.log"
 $workerOut = Join-Path $LogsDir "worker-out.log"
 $workerErr = Join-Path $LogsDir "worker-err.log"
 
 Write-Host ""
 Write-Host "Proyecto:  $ProjectRoot"
-Write-Host "API:       http://localhost:$apiPort"
-Write-Host "Frontend:  http://localhost:$frontendPort"
+Write-Host "API+Web:   http://localhost:$apiPort"
 Write-Host ""
 
 Install-Service `
@@ -147,19 +149,17 @@ Install-Service `
   -AppArgs "src\index.js" `
   -WorkDir $ServerDir `
   -DisplayName "Facturacion FE - API" `
-  -Description "API Node.js facturacion electronica (puerto $apiPort)" `
+  -Description "API Node.js y frontend dist (puerto $apiPort)" `
   -OutLog $apiOut `
   -ErrLog $apiErr
 
-Install-Service `
-  -Name $ServiceWeb `
-  -Exe $cmdExe `
-  -AppArgs "/c npx --yes serve -p $frontendPort" `
-  -WorkDir $ProjectRoot `
-  -DisplayName "Facturacion FE - Web" `
-  -Description "Frontend estatico facturacion electronica (puerto $frontendPort)" `
-  -OutLog $webOut `
-  -ErrLog $webErr
+if (Test-NssmService -Name $ServiceWeb) {
+  Write-Host "El frontend ahora lo sirve la API (dist/). Deteniendo $ServiceWeb..."
+  $prev = $ErrorActionPreference
+  $ErrorActionPreference = "SilentlyContinue"
+  & $nssm stop $ServiceWeb confirm 2>&1 | Out-Null
+  $ErrorActionPreference = $prev
+}
 
 Install-Service `
   -Name $ServiceWorker `
@@ -182,6 +182,6 @@ if ($facturaModo -eq "solo_xml") {
 Write-Host ""
 Write-Host "Servicios instalados y en ejecucion."
 Write-Host "  nssm status $ServiceApi"
-Write-Host "  nssm status $ServiceWeb"
 Write-Host "  nssm status $ServiceWorker"
+Write-Host "Frontend: http://localhost:$apiPort  (servido por la API desde dist/)"
 Write-Host "Logs en: $LogsDir"

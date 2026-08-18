@@ -15,6 +15,7 @@ import { getApiPort, getFrontendUrl, getApiBaseUrl } from "./config/appPorts.js"
 import { getModoFactura } from "./config/feModo.js";
 import { setWorkerRuntimeEnabled } from "./config/workerRuntime.js";
 import { controlNssmWorkerService } from "./services/workerControl.service.js";
+import { mountFrontend, shouldServeFrontend } from "./serveFrontend.js";
 
 dotenv.config();
 
@@ -37,10 +38,12 @@ syncWorkerOnApiBoot().catch((error) => {
 const app = express();
 const PORT = getApiPort();
 const corsOrigin = getFrontendUrl();
+const serveFrontend = shouldServeFrontend();
 
 function isAllowedOrigin(origin) {
   if (!origin) return true;
   if (origin === corsOrigin) return true;
+  if (origin === getApiBaseUrl()) return true;
   return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
 }
 
@@ -67,6 +70,10 @@ app.use("/api/config", configRoutes);
 app.use("/api", facturaRoutes);
 app.use("/api", notaCreditoRoutes);
 
+if (serveFrontend) {
+  mountFrontend(app);
+}
+
 app.use(handleAuthError);
 
 app.use((err, _req, res, _next) => {
@@ -90,5 +97,9 @@ app.use((err, _req, res, _next) => {
 
 app.listen(PORT, () => {
   console.log(`API escuchando en ${getApiBaseUrl()}`);
-  console.log(`CORS frontend permitido: ${corsOrigin}`);
+  if (serveFrontend) {
+    console.log(`Frontend (dist) en ${getApiBaseUrl()}`);
+  } else {
+    console.log(`CORS frontend permitido: ${corsOrigin}`);
+  }
 });

@@ -1,0 +1,17 @@
+{
+  "name": "facturacion-fe",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "build:release": "vite build && node scripts/build-release.js"
+  },
+  "devDependencies": {
+    "vite": "^6.3.5"
+  }
+}

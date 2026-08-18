@@ -13,18 +13,6 @@ $ErrorActionPreference = "Stop"
 
 $ScriptDir = $PSScriptRoot
 $ServerDir = Resolve-Path (Join-Path $ScriptDir "..")
-$ProjectRoot = Resolve-Path (Join-Path $ServerDir "..")
-
-function Get-EnvValue {
-  param([string]$Key, [string]$Default)
-  $envFile = Join-Path $ServerDir ".env"
-  if (-not (Test-Path $envFile)) { return $Default }
-  $line = Get-Content $envFile | Where-Object { $_ -match "^\s*$([regex]::Escape($Key))\s*=" } | Select-Object -First 1
-  if (-not $line) { return $Default }
-  $value = ($line -split "=", 2)[1].Trim()
-  if ($value) { return $value }
-  return $Default
-}
 
 function Require-Command {
   param([string]$Name)
@@ -47,9 +35,6 @@ function Set-NssmAppParameters {
 
 $nssm = Require-Command "nssm"
 $nodeExe = Require-Command "node"
-$cmdExe = Require-Command "cmd"
-
-$frontendPort = Get-EnvValue "FRONTEND_PORT" "8080"
 
 $services = @(
   @{
@@ -57,12 +42,6 @@ $services = @(
     Application = $nodeExe
     AppDirectory = $ServerDir
     AppParameters = "src\index.js"
-  },
-  @{
-    Name = "FacturacionFE-Web"
-    Application = $cmdExe
-    AppDirectory = $ProjectRoot
-    AppParameters = "/c npx --yes serve -p $frontendPort"
   },
   @{
     Name = "FacturacionFE-Worker"

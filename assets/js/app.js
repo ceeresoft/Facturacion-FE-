@@ -1,5 +1,10 @@
-const API_BASE_URL =
-  window.APP_CONFIG?.apiBaseUrl ?? "http://localhost:3005";
+import "../../lib/bootstrap/js/bootstrap.bundle.min.js";
+
+const bootstrap = window.bootstrap;
+const API_BASE_URL = String(window.APP_CONFIG?.apiBaseUrl ?? "").replace(
+  /\/$/,
+  ""
+);
 const SESSION_KEY = "fe-sesion";
 const TOKEN_KEY = "fe-token";
 const USER_KEY = "fe-user";
