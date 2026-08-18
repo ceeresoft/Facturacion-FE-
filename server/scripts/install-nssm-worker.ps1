@@ -50,6 +50,51 @@ function Set-NssmAppParameters {
   }
 }
 
+function Get-NssmStatusText {
+  param(
+    [string]$Nssm,
+    [string]$Name
+  )
+  $prev = $ErrorActionPreference
+  $ErrorActionPreference = "SilentlyContinue"
+  $raw = (& $Nssm status $Name 2>&1 | Out-String)
+  $ErrorActionPreference = $prev
+  if ($raw -match "SERVICE_[A-Z_]+") {
+    return $Matches[0]
+  }
+  return $raw.Trim()
+}
+
+function Start-NssmServiceWait {
+  param(
+    [string]$Nssm,
+    [string]$Name,
+    [string]$ErrLog,
+    [int]$TimeoutSec = 40
+  )
+  Write-Host "Iniciando $Name..."
+  $prev = $ErrorActionPreference
+  $ErrorActionPreference = "SilentlyContinue"
+  & $Nssm start $Name 2>&1 | Out-Null
+  $ErrorActionPreference = $prev
+
+  $deadline = (Get-Date).AddSeconds($TimeoutSec)
+  $status = ""
+  do {
+    $status = Get-NssmStatusText -Nssm $Nssm -Name $Name
+    if ($status -eq "SERVICE_RUNNING") {
+      Write-Host "$Name : SERVICE_RUNNING"
+      return
+    }
+    if ($status -eq "SERVICE_STOPPED" -or $status -eq "SERVICE_PAUSED") {
+      throw "No se pudo iniciar el servicio $Name (estado $status). Revisa $ErrLog"
+    }
+    Start-Sleep -Seconds 1
+  } while ((Get-Date) -lt $deadline)
+
+  throw "Timeout esperando $Name (ultimo estado: $status). Revisa $ErrLog"
+}
+
 $nssm = Require-Command "nssm"
 $nodeExe = Require-Command "node"
 
@@ -108,9 +153,7 @@ if ($facturaModo -eq "solo_xml") {
   & $nssm stop $ServiceWorker confirm 2>&1 | Out-Null
   $ErrorActionPreference = $prevEap
 } else {
-  Write-Host "Iniciando $ServiceWorker..."
-  & $nssm start $ServiceWorker
-  if ($LASTEXITCODE -ne 0) { throw "No se pudo iniciar el servicio $ServiceWorker. Revisa $workerErr" }
+  Start-NssmServiceWait -Nssm $nssm -Name $ServiceWorker -ErrLog $workerErr
 }
 
 Write-Host ""

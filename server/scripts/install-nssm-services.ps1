@@ -52,6 +52,47 @@ function Test-NssmService {
   return $ok
 }
 
+function Get-NssmStatusText {
+  param([string]$Name)
+  $prev = $ErrorActionPreference
+  $ErrorActionPreference = "SilentlyContinue"
+  $raw = (& $nssm status $Name 2>&1 | Out-String)
+  $ErrorActionPreference = $prev
+  if ($raw -match "SERVICE_[A-Z_]+") {
+    return $Matches[0]
+  }
+  return $raw.Trim()
+}
+
+function Start-NssmServiceWait {
+  param(
+    [string]$Name,
+    [string]$ErrLog,
+    [int]$TimeoutSec = 40
+  )
+  Write-Host "Iniciando $Name..."
+  $prev = $ErrorActionPreference
+  $ErrorActionPreference = "SilentlyContinue"
+  & $nssm start $Name 2>&1 | Out-Null
+  $ErrorActionPreference = $prev
+
+  $deadline = (Get-Date).AddSeconds($TimeoutSec)
+  $status = ""
+  do {
+    $status = Get-NssmStatusText -Name $Name
+    if ($status -eq "SERVICE_RUNNING") {
+      Write-Host "$Name : SERVICE_RUNNING"
+      return
+    }
+    if ($status -eq "SERVICE_STOPPED" -or $status -eq "SERVICE_PAUSED") {
+      throw "No se pudo iniciar el servicio $Name (estado $status). Revisa $ErrLog"
+    }
+    Start-Sleep -Seconds 1
+  } while ((Get-Date) -lt $deadline)
+
+  throw "Timeout esperando $Name (ultimo estado: $status). Revisa $ErrLog"
+}
+
 $nssm = Require-Command "nssm"
 $nodeExe = Require-Command "node"
 
@@ -129,8 +170,7 @@ function Install-Service {
   }
 
   Write-Host "Iniciando $Name..."
-  & $nssm start $Name
-  if ($LASTEXITCODE -ne 0) { throw "No se pudo iniciar el servicio $Name. Revisa $ErrLog" }
+  Start-NssmServiceWait -Name $Name -ErrLog $ErrLog
 }
 
 $apiOut = Join-Path $LogsDir "api-out.log"
