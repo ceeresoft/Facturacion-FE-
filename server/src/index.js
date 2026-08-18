@@ -6,6 +6,7 @@ import authRoutes from "./routes/auth.routes.js";
 import facturaRoutes, { FacturaError } from "./routes/factura.routes.js";
 import notaCreditoRoutes from "./routes/notaCredito.routes.js";
 import empresaRoutes, { EmpresaError } from "./routes/empresa.routes.js";
+import entidadRoutes, { EntidadError } from "./routes/entidad.routes.js";
 import configRoutes from "./routes/config.routes.js";
 import { handleAuthError } from "./middleware/auth.middleware.js";
 import { AuthError } from "./services/auth.service.js";
@@ -61,6 +62,7 @@ app.use(express.json());
 app.use("/api/health", healthRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api", empresaRoutes);
+app.use("/api", entidadRoutes);
 app.use("/api/config", configRoutes);
 app.use("/api", facturaRoutes);
 app.use("/api", notaCreditoRoutes);
@@ -72,6 +74,7 @@ app.use((err, _req, res, _next) => {
     err instanceof AuthError ||
     err instanceof FacturaError ||
     err instanceof EmpresaError ||
+    err instanceof EntidadError ||
     err instanceof FacturatechError
   ) {
     return res.status(err.statusCode || 400).json({ ok: false, message: err.message });

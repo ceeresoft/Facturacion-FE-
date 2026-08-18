@@ -370,6 +370,7 @@ GO
 
 ------------------------------------------------------------------------------
 -- VISTA: Face Cnsta FacturaE Entidad
+-- Responsable de pago de la factura (Factura.[Documento Responsable]), NO el paciente.
 ------------------------------------------------------------------------------
 CREATE OR ALTER VIEW [dbo].[Face Cnsta FacturaE Entidad]
 AS
@@ -381,6 +382,9 @@ SELECT DISTINCT
   en.[Segundo Nombre Entidad] AS SegundoNombreEntidad,
   en.[Nombre Completo Entidad] AS NombreCompletoEntidad,
   e.[Dirección EntidadII] AS DireccionEntidad,
+  e.[Id Ciudad] AS IdCiudadEntidad,
+  c.[Id Departamento] AS IdDepartamentoEntidad,
+  d.[Id País] AS IdPaisEntidad,
   c.[Código Ciudad] AS CodigoCiudad,
   UPPER(c.Ciudad) AS NombreCiudadEntidad,
   d.[Código Departamento] AS CodigoDepartamentoEntidad,
@@ -852,6 +856,69 @@ BEGIN
 END
 ELSE
   PRINT N'Registro Tipo Empresa Id=6 ya existe — omitido.';
+GO
+
+
+------------------------------------------------------------------------------
+-- VISTA: Face cnsta Pais
+------------------------------------------------------------------------------
+CREATE OR ALTER VIEW [dbo].[Face cnsta Pais]
+AS
+SELECT
+  [Id País],
+  [Código País],
+  País,
+  [Descripción País],
+  [Orden País],
+  [Id Estado]
+FROM dbo.País
+WHERE ([Id Estado] = 7)
+GO
+
+
+------------------------------------------------------------------------------
+-- VISTA: Face cnsta Departamento
+------------------------------------------------------------------------------
+CREATE OR ALTER VIEW [dbo].[Face cnsta Departamento]
+AS
+SELECT
+  [Id Departamento],
+  [Código Departamento],
+  Departamento,
+  [Id País]
+FROM dbo.Departamento
+GO
+
+
+------------------------------------------------------------------------------
+-- VISTA: Face cnsta Ciudad
+------------------------------------------------------------------------------
+CREATE OR ALTER VIEW [dbo].[Face cnsta Ciudad]
+AS
+SELECT
+  [Id Ciudad],
+  Ciudad,
+  [Código Ciudad],
+  [Id Departamento]
+FROM dbo.Ciudad
+GO
+
+
+------------------------------------------------------------------------------
+-- VISTA: Face Cnsta TipoDocumento
+------------------------------------------------------------------------------
+CREATE OR ALTER VIEW [dbo].[Face Cnsta TipoDocumento]
+AS
+SELECT
+  [Id Tipo de Documento],
+  [Código Tipo de Documento],
+  [Tipo de Documento],
+  [Descripción Tipo de Documento],
+  [Orden Tipo de Documento],
+  [Id Estado],
+  codigoDian
+FROM dbo.[Tipo de Documento]
+WHERE ([Id Estado] = 7) AND (codigoDian IS NOT NULL)
 GO
 
 

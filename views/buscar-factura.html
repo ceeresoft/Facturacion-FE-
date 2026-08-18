@@ -131,27 +131,23 @@
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
       <div class="modal-content modal-usuario">
         <div class="modal-header">
-          <h5 class="modal-title" id="modalEditarUsuarioLabel">Editar datos del usuario</h5>
+          <h5 class="modal-title" id="modalEditarUsuarioLabel">Editar datos del responsable</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
         </div>
         <div class="modal-body">
-          <p class="profile-hint mb-3">Complete o corrija los datos del adquiriente. [Pendiente integrar] Persistencia en BD del usuario.</p>
+          <p class="profile-hint mb-3">Datos del responsable de pago de la factura (no del paciente). Los cambios se guardan en la base de datos.</p>
           <div id="perfilUsuarioAlert" class="alert d-none mb-3" role="alert"></div>
           <form id="perfilUsuarioForm" novalidate>
             <div class="row g-3">
               <div class="col-12 col-md-4">
                 <label for="usuarioTipoDocumento" class="form-label">Tipo de documento</label>
                 <select class="form-select" id="usuarioTipoDocumento" name="tipoDocumento" required>
-                  <option value="CC">Cédula de ciudadanía</option>
-                  <option value="CE">Cédula de extranjería</option>
-                  <option value="NIT">NIT</option>
-                  <option value="PA">Pasaporte</option>
-                  <option value="TI">Tarjeta de identidad</option>
+                  <option value="" selected disabled>Cargando tipos de documento…</option>
                 </select>
               </div>
               <div class="col-12 col-md-4">
                 <label for="usuarioIdentificacion" class="form-label">Identificación</label>
-                <input type="text" class="form-control" id="usuarioIdentificacion" name="identificacion" required>
+                <input type="text" class="form-control" id="usuarioIdentificacion" name="identificacion" readonly required aria-readonly="true">
               </div>
               <div class="col-12 col-md-4">
                 <label for="usuarioRegimen" class="form-label">Régimen</label>
@@ -162,13 +158,21 @@
                   <option value="Régimen simple">Régimen simple</option>
                 </select>
               </div>
-              <div class="col-12 col-md-6">
-                <label for="usuarioNombres" class="form-label">Nombres</label>
-                <input type="text" class="form-control" id="usuarioNombres" name="nombres" required>
+              <div class="col-12 col-md-3">
+                <label for="usuarioPrimerNombre" class="form-label">Primer nombre</label>
+                <input type="text" class="form-control" id="usuarioPrimerNombre" name="primerNombre" required>
               </div>
-              <div class="col-12 col-md-6">
-                <label for="usuarioApellidos" class="form-label">Apellidos</label>
-                <input type="text" class="form-control" id="usuarioApellidos" name="apellidos" required>
+              <div class="col-12 col-md-3">
+                <label for="usuarioSegundoNombre" class="form-label">Segundo nombre</label>
+                <input type="text" class="form-control" id="usuarioSegundoNombre" name="segundoNombre">
+              </div>
+              <div class="col-12 col-md-3">
+                <label for="usuarioPrimerApellido" class="form-label">Primer apellido</label>
+                <input type="text" class="form-control" id="usuarioPrimerApellido" name="primerApellido" required>
+              </div>
+              <div class="col-12 col-md-3">
+                <label for="usuarioSegundoApellido" class="form-label">Segundo apellido</label>
+                <input type="text" class="form-control" id="usuarioSegundoApellido" name="segundoApellido">
               </div>
               <div class="col-12 col-md-6">
                 <label for="usuarioEmail" class="form-label">E-mail</label>
@@ -179,12 +183,22 @@
                 <input type="tel" class="form-control" id="usuarioTelefono" name="telefono" placeholder="Ej: 300 123 4567">
               </div>
               <div class="col-12 col-md-4">
+                <label for="usuarioPais" class="form-label">País</label>
+                <select class="form-select" id="usuarioPais" name="pais" required>
+                  <option value="" selected disabled>Cargando países...</option>
+                </select>
+              </div>
+              <div class="col-12 col-md-4">
                 <label for="usuarioDepartamento" class="form-label">Departamento</label>
-                <input type="text" class="form-control" id="usuarioDepartamento" name="departamento">
+                <select class="form-select" id="usuarioDepartamento" name="departamento" required disabled>
+                  <option value="" selected disabled>Seleccione país primero</option>
+                </select>
               </div>
               <div class="col-12 col-md-4">
                 <label for="usuarioCiudad" class="form-label">Ciudad</label>
-                <input type="text" class="form-control" id="usuarioCiudad" name="ciudad">
+                <select class="form-select" id="usuarioCiudad" name="ciudad" required disabled>
+                  <option value="" selected disabled>Seleccione departamento primero</option>
+                </select>
               </div>
               <div class="col-12 col-md-4">
                 <label for="usuarioDireccion" class="form-label">Dirección</label>

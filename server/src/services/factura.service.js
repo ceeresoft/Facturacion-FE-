@@ -1,6 +1,7 @@
 import { getPool, sql } from "../config/db.js";
 import { resolveDetailTable } from "./itemRouter.service.js";
 import { obtenerPdfFactura, obtenerCufeFactura, FacturatechError } from "./facturatech.service.js";
+import { obtenerUbicacionPorDocumento } from "./ubicacion.service.js";
 import {
   formatFechaDisplay,
   mapMedioPago,
@@ -24,7 +25,22 @@ const DETAIL_TABLES = new Set([
   "[Face Cnsta FacturaEII]",
 ]);
 
-function normalizeEntidad(row, emailEmpresaFallback = "") {
+function pickRowValue(row, ...keys) {
+  if (!row) return null;
+  for (const key of keys) {
+    if (row[key] != null && row[key] !== "") {
+      return row[key];
+    }
+  }
+  return null;
+}
+
+function asId(value) {
+  if (value == null || value === "") return "";
+  return String(value);
+}
+
+function normalizeEntidad(row, emailEmpresaFallback = "", ubicacion = null) {
   if (!row) return null;
 
   let segundoNombre = row.SegundoNombreEntidad ?? "";
@@ -56,15 +72,36 @@ function normalizeEntidad(row, emailEmpresaFallback = "") {
     .trim();
 
   return {
+    documentoEntidad: String(row.DocumentoEntidad ?? ""),
+    idTipoDocumento:
+      row.IdTipoDocumentoEntidad != null
+        ? String(row.IdTipoDocumentoEntidad)
+        : "",
     tipoDocumento:
       row.DescripcionDocumentoEntidad ?? String(row.IdTipoDocumentoEntidad ?? ""),
     identificacion: String(row.DocumentoEntidad ?? ""),
+    primerNombre: String(row.PrimerNombreEntidad ?? "").trim(),
+    segundoNombre: String(segundoNombre).trim(),
+    primerApellido: String(row.PrimerApellidoEntidad ?? "").trim(),
+    segundoApellido: String(row.SegundoApellidoEntidad ?? "").trim(),
     nombres,
     apellidos,
     nombreCompleto: row.NombreCompletoEntidad ?? "",
     email: String(email).trim(),
-    departamento: row.NombreDepartamentoEntidad ?? "",
-    ciudad: row.NombreCiudadEntidad ?? "",
+    idPais: asId(
+      pickRowValue(row, "IdPaisEntidad", "idPais") ?? ubicacion?.idPais
+    ),
+    idDepartamento: asId(
+      pickRowValue(row, "IdDepartamentoEntidad", "idDepartamento") ??
+        ubicacion?.idDepartamento
+    ),
+    idCiudad: asId(
+      pickRowValue(row, "IdCiudadEntidad", "idCiudad") ?? ubicacion?.idCiudad
+    ),
+    pais: row.PaisEntidad ?? ubicacion?.pais ?? "",
+    departamento:
+      row.NombreDepartamentoEntidad ?? ubicacion?.departamento ?? "",
+    ciudad: row.NombreCiudadEntidad ?? ubicacion?.ciudad ?? "",
     direccion: row.DireccionEntidad ?? "",
     barrio: row.BarrioCiudad ?? "",
     telefono: telefono != null ? String(telefono) : "",
@@ -363,6 +400,7 @@ async function consultaEmpresaRow(pool, numero, idEmpresaV) {
 }
 
 async function consultaEntidadRow(pool, numero, idEmpresaV) {
+  // [Face Cnsta FacturaE Entidad] usa Factura.[Documento Responsable], no Documento Paciente.
   const result = await pool
     .request()
     .input("numero", sql.NVarChar, numero)
@@ -463,10 +501,14 @@ export async function consultaFacturaCompleta(numero, idEmpresaV) {
 
   const empresa = normalizeEmpresa(empresaRow);
   const emailEmpresaFallback = empresa?.email ?? empresaRow?.EmailEmpresa ?? "";
+  const documentoEntidad = String(entidadRow?.DocumentoEntidad ?? "").trim();
+  const ubicacion = documentoEntidad
+    ? await obtenerUbicacionPorDocumento(documentoEntidad)
+    : null;
 
   return {
     empresa,
-    usuario: normalizeEntidad(entidadRow, emailEmpresaFallback),
+    usuario: normalizeEntidad(entidadRow, emailEmpresaFallback, ubicacion),
     factura: normalizeFacturaHeader(header),
     items,
   };

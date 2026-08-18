@@ -4,17 +4,26 @@ const SESSION_KEY = "fe-sesion";
 const TOKEN_KEY = "fe-token";
 const USER_KEY = "fe-user";
 const EMPRESA_ACTIVA_KEY = "fe-empresa-activa";
-const USUARIO_PERFIL_KEY = "fe-usuario-perfil";
+const USUARIO_PERFIL_LEGACY_KEY = "fe-usuario-perfil";
 
 /** Texto visible donde aún no hay integración con backend */
 const PENDIENTE_INTEGRAR = "[Pendiente integrar]";
 
 const USUARIO_PERFIL_DEFAULT = {
+  idTipoDocumento: "",
   tipoDocumento: "",
   identificacion: "",
+  primerNombre: "",
+  segundoNombre: "",
+  primerApellido: "",
+  segundoApellido: "",
   nombres: "",
   apellidos: "",
   email: "",
+  pais: "",
+  idPais: "",
+  idDepartamento: "",
+  idCiudad: "",
   departamento: "",
   ciudad: "",
   direccion: "",
@@ -37,6 +46,13 @@ let workerStatusTimer = null;
 let modalRespuestaInstance = null;
 let modalConfirmarInstance = null;
 let confirmarResolver = null;
+let tiposDocumentoCatalogo = [];
+let tiposDocumentoPromise = null;
+let paisesCatalogo = [];
+let paisesCatalogoPromise = null;
+let ubicacionListenersBound = false;
+let ubicacionCargando = false;
+let ubicacionInitSeq = 0;
 
 const ACCORDION_IDS = ["secEmpresa", "secUsuario", "secFactura", "secItems"];
 
@@ -188,10 +204,10 @@ function initModalesMensajes() {
  * Integraciones pendientes:
  * - Nota crédito: controladorFacturaNotaNC.php
  * - Envío XML / SOAP: generadorXMLFactura.php (líneas 1630+)
- * - Perfil usuario en BD (hoy solo localStorage en consulta)
  */
 document.addEventListener("DOMContentLoaded", () => {
   migrarPerfilEmpresaLegacy();
+  migrarPerfilUsuarioLegacy();
   initModalesMensajes();
   initSession();
   initLogin();
@@ -322,6 +338,10 @@ function initLogout() {
 function migrarPerfilEmpresaLegacy() {
   localStorage.removeItem("fe-empresa-perfil");
   localStorage.removeItem("fe-empresa-perfiles");
+}
+
+function migrarPerfilUsuarioLegacy() {
+  localStorage.removeItem(USUARIO_PERFIL_LEGACY_KEY);
 }
 
 function getEmpresaActivaId() {
@@ -634,51 +654,31 @@ function initPerfilEmpresa() {
   });
 }
 
-function getUsuarioEdiciones() {
-  try {
-    return JSON.parse(localStorage.getItem(USUARIO_PERFIL_KEY) || "{}");
-  } catch {
-    return {};
-  }
-}
-
 function getUsuarioPerfil() {
-  return ultimaEntidadConsulta || { ...USUARIO_PERFIL_DEFAULT, ...getUsuarioEdiciones() };
+  return ultimaEntidadConsulta || { ...USUARIO_PERFIL_DEFAULT };
 }
 
-function saveUsuarioPerfil(data) {
-  localStorage.setItem(USUARIO_PERFIL_KEY, JSON.stringify(data));
-}
-
-/** Entidad/responsable de la factura (API). No mezclar documento del usuario logueado. */
-function mergeEntidadConEdiciones(entidadApi) {
-  const base = entidadApi || {};
-  const ediciones = getUsuarioEdiciones();
-  const camposDesdeApi = [
-    "tipoDocumento",
-    "identificacion",
-    "nombres",
-    "apellidos",
-    "nombreCompleto",
-  ];
-
-  const merged = { ...base };
-
-  Object.entries(ediciones).forEach(([key, value]) => {
-    if (!value || !String(value).trim()) return;
-
-    if (
-      camposDesdeApi.includes(key) &&
-      base[key] &&
-      String(base[key]).trim()
-    ) {
-      return;
+async function guardarEntidadResponsableEnApi(documentoEntidad, data) {
+  const response = await apiFetch(
+    `/api/entidades/${encodeURIComponent(documentoEntidad)}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(data),
     }
+  );
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.message || "No se pudo guardar los datos del responsable");
+  }
+  return payload.entidad;
+}
 
-    merged[key] = value;
-  });
-
-  return merged;
+function getDocumentoEntidadOriginal() {
+  return (
+    ultimaEntidadConsulta?.documentoEntidad ||
+    ultimaEntidadConsulta?.identificacion ||
+    ""
+  );
 }
 
 function isUsuarioIncompleto(usuario) {
@@ -687,8 +687,9 @@ function isUsuarioIncompleto(usuario) {
     usuario.telefono,
     usuario.direccion,
     usuario.regimen,
+    usuario.idCiudad || usuario.ciudad,
     usuario.departamento,
-    usuario.ciudad,
+    usuario.pais,
   ];
   return campos.some((c) => !c || !String(c).trim());
 }
@@ -697,33 +698,400 @@ function displayValue(value) {
   return value && String(value).trim() ? value : "—";
 }
 
+async function cargarTiposDocumentoCatalogo() {
+  if (tiposDocumentoCatalogo.length) {
+    return tiposDocumentoCatalogo;
+  }
+
+  if (!tiposDocumentoPromise) {
+    tiposDocumentoPromise = apiFetch("/api/config/tipos-documento")
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.message || "No se pudieron cargar los tipos de documento");
+        }
+        tiposDocumentoCatalogo = data.tipos || [];
+        return tiposDocumentoCatalogo;
+      })
+      .catch((error) => {
+        tiposDocumentoPromise = null;
+        throw error;
+      });
+  }
+
+  return tiposDocumentoPromise;
+}
+
+function renderTiposDocumentoSelect(select, selectedValue = "") {
+  if (!select) return;
+
+  if (!tiposDocumentoCatalogo.length) {
+    select.innerHTML =
+      '<option value="" selected disabled>No hay tipos de documento disponibles</option>';
+    return;
+  }
+
+  const options = [
+    '<option value="" disabled>Seleccione tipo de documento</option>',
+    ...tiposDocumentoCatalogo.map((tipo) => {
+      const id = String(tipo.id);
+      const selected = id === String(selectedValue) ? " selected" : "";
+      return `<option value="${escapeHtml(id)}" data-descripcion="${escapeHtml(tipo.descripcion)}" data-codigo-dian="${escapeHtml(tipo.codigoDian ?? "")}"${selected}>${escapeHtml(tipo.descripcion || tipo.codigo)}</option>`;
+    }),
+  ];
+
+  select.innerHTML = options.join("");
+}
+
+function resolverIdTipoDocumento(perfil = {}) {
+  if (perfil.idTipoDocumento) {
+    return String(perfil.idTipoDocumento);
+  }
+
+  const descripcion = String(perfil.tipoDocumento ?? "").trim();
+  if (!descripcion) return "";
+
+  const match = tiposDocumentoCatalogo.find(
+    (tipo) =>
+      String(tipo.descripcion).trim() === descripcion ||
+      String(tipo.codigo).trim() === descripcion ||
+      String(tipo.id) === descripcion
+  );
+
+  return match ? String(match.id) : "";
+}
+
+async function cargarPaisesCatalogo() {
+  if (paisesCatalogo.length) {
+    return paisesCatalogo;
+  }
+
+  if (!paisesCatalogoPromise) {
+    paisesCatalogoPromise = apiFetch("/api/config/paises")
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.message || "No se pudieron cargar los países");
+        }
+        paisesCatalogo = data.paises || [];
+        return paisesCatalogo;
+      })
+      .catch((error) => {
+        paisesCatalogoPromise = null;
+        throw error;
+      });
+  }
+
+  return paisesCatalogoPromise;
+}
+
+function renderUbicacionSelect(
+  select,
+  items,
+  selectedValue = "",
+  placeholder = "Seleccione",
+  disabled = false
+) {
+  if (!select) return;
+
+  select.disabled = disabled;
+
+  if (!items.length) {
+    select.innerHTML = `<option value="" selected disabled>${escapeHtml(placeholder)}</option>`;
+    return;
+  }
+
+  const options = [
+    `<option value="" disabled${selectedValue ? "" : " selected"}>${escapeHtml(placeholder)}</option>`,
+    ...items.map((item) => {
+      const id = String(item.id);
+      const selected = id === String(selectedValue) ? " selected" : "";
+      return `<option value="${escapeHtml(id)}"${selected}>${escapeHtml(item.nombre || item.codigo || id)}</option>`;
+    }),
+  ];
+
+  select.innerHTML = options.join("");
+
+  if (selectedValue) {
+    select.value = String(selectedValue);
+  }
+}
+
+async function cargarDepartamentosSelect(idPais, selectedValue = "") {
+  const select = document.getElementById("usuarioDepartamento");
+  const ciudadSelect = document.getElementById("usuarioCiudad");
+  if (!select) return;
+
+  if (!idPais) {
+    renderUbicacionSelect(
+      select,
+      [],
+      "",
+      "Seleccione país primero",
+      true
+    );
+    renderUbicacionSelect(
+      ciudadSelect,
+      [],
+      "",
+      "Seleccione departamento primero",
+      true
+    );
+    return;
+  }
+
+  select.disabled = true;
+  select.innerHTML = '<option value="" selected disabled>Cargando departamentos...</option>';
+
+  try {
+    const response = await apiFetch(
+      `/api/config/departamentos?paisId=${encodeURIComponent(idPais)}`
+    );
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || "No se pudieron cargar los departamentos");
+    }
+
+    renderUbicacionSelect(
+      select,
+      data.departamentos || [],
+      selectedValue,
+      "Seleccione departamento",
+      false
+    );
+
+    if (!selectedValue) {
+      renderUbicacionSelect(
+        ciudadSelect,
+        [],
+        "",
+        "Seleccione departamento primero",
+        true
+      );
+    }
+  } catch {
+    renderUbicacionSelect(
+      select,
+      [],
+      "",
+      "Error al cargar departamentos",
+      true
+    );
+  }
+}
+
+async function cargarCiudadesSelect(idDepartamento, selectedValue = "") {
+  const select = document.getElementById("usuarioCiudad");
+  if (!select) return;
+
+  if (!idDepartamento) {
+    renderUbicacionSelect(
+      select,
+      [],
+      "",
+      "Seleccione departamento primero",
+      true
+    );
+    return;
+  }
+
+  select.disabled = true;
+  select.innerHTML = '<option value="" selected disabled>Cargando ciudades...</option>';
+
+  try {
+    const response = await apiFetch(
+      `/api/config/ciudades?departamentoId=${encodeURIComponent(idDepartamento)}`
+    );
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || "No se pudieron cargar las ciudades");
+    }
+
+    renderUbicacionSelect(
+      select,
+      data.ciudades || [],
+      selectedValue,
+      "Seleccione ciudad",
+      false
+    );
+  } catch {
+    renderUbicacionSelect(
+      select,
+      [],
+      "",
+      "Error al cargar ciudades",
+      true
+    );
+  }
+}
+
+function bindUbicacionListeners() {
+  if (ubicacionListenersBound) return;
+
+  const paisSelect = document.getElementById("usuarioPais");
+  const departamentoSelect = document.getElementById("usuarioDepartamento");
+
+  paisSelect?.addEventListener("change", async (event) => {
+    if (ubicacionCargando) return;
+    await cargarDepartamentosSelect(event.target.value);
+  });
+
+  departamentoSelect?.addEventListener("change", async (event) => {
+    if (ubicacionCargando) return;
+    await cargarCiudadesSelect(event.target.value);
+  });
+
+  ubicacionListenersBound = true;
+}
+
+async function completarUbicacionPerfil(perfil = {}) {
+  if (perfil.idPais && perfil.idDepartamento && perfil.idCiudad) {
+    return perfil;
+  }
+
+  if (!perfil.idCiudad) {
+    return perfil;
+  }
+
+  const response = await apiFetch(
+    `/api/config/ubicacion?ciudadId=${encodeURIComponent(perfil.idCiudad)}`
+  );
+  const data = await response.json();
+  if (!response.ok || !data.ubicacion) {
+    return perfil;
+  }
+
+  return {
+    ...perfil,
+    idPais: data.ubicacion.idPais || perfil.idPais || "",
+    idDepartamento: data.ubicacion.idDepartamento || perfil.idDepartamento || "",
+    idCiudad: data.ubicacion.idCiudad || perfil.idCiudad || "",
+    pais: data.ubicacion.pais || perfil.pais || "",
+    departamento: data.ubicacion.departamento || perfil.departamento || "",
+    ciudad: data.ubicacion.ciudad || perfil.ciudad || "",
+  };
+}
+
+async function initUbicacionSelects(perfil = {}) {
+  const paisSelect = document.getElementById("usuarioPais");
+  if (!paisSelect) return;
+
+  const seq = ++ubicacionInitSeq;
+  ubicacionCargando = true;
+
+  try {
+    const ubicacion = await completarUbicacionPerfil(perfil);
+    if (seq !== ubicacionInitSeq) return;
+
+    await cargarPaisesCatalogo();
+    if (seq !== ubicacionInitSeq) return;
+
+    renderUbicacionSelect(
+      paisSelect,
+      paisesCatalogo,
+      ubicacion.idPais || "",
+      "Seleccione país",
+      false
+    );
+
+    if (ubicacion.idPais) {
+      await cargarDepartamentosSelect(
+        ubicacion.idPais,
+        ubicacion.idDepartamento || ""
+      );
+      if (seq !== ubicacionInitSeq) return;
+
+      if (ubicacion.idDepartamento) {
+        await cargarCiudadesSelect(
+          ubicacion.idDepartamento,
+          ubicacion.idCiudad || ""
+        );
+      }
+    } else {
+      await cargarDepartamentosSelect("");
+    }
+  } catch {
+    if (seq !== ubicacionInitSeq) return;
+    renderUbicacionSelect(
+      paisSelect,
+      [],
+      "",
+      "Error al cargar países",
+      true
+    );
+    await cargarDepartamentosSelect("");
+  } finally {
+    if (seq === ubicacionInitSeq) {
+      ubicacionCargando = false;
+    }
+  }
+}
+
+async function ensureTiposDocumentoSelect(select, perfil = {}) {
+  await cargarTiposDocumentoCatalogo();
+  renderTiposDocumentoSelect(select, resolverIdTipoDocumento(perfil));
+}
+
 function cargarFormularioUsuario() {
   const form = document.getElementById("perfilUsuarioForm");
   if (!form) return;
 
   const perfil = getUsuarioPerfil();
-  form.querySelector("#usuarioTipoDocumento").value = perfil.tipoDocumento;
+  const select = form.querySelector("#usuarioTipoDocumento");
+
+  bindUbicacionListeners();
+
+  Promise.all([
+    ensureTiposDocumentoSelect(select, perfil),
+    initUbicacionSelects(perfil),
+  ]).catch(() => {
+    if (select) {
+      select.innerHTML =
+        '<option value="" selected disabled>Error al cargar tipos de documento</option>';
+    }
+  });
+
   form.querySelector("#usuarioIdentificacion").value = perfil.identificacion;
-  form.querySelector("#usuarioNombres").value = perfil.nombres;
-  form.querySelector("#usuarioApellidos").value = perfil.apellidos;
+  form.querySelector("#usuarioPrimerNombre").value = perfil.primerNombre || "";
+  form.querySelector("#usuarioSegundoNombre").value = perfil.segundoNombre || "";
+  form.querySelector("#usuarioPrimerApellido").value = perfil.primerApellido || "";
+  form.querySelector("#usuarioSegundoApellido").value = perfil.segundoApellido || "";
   form.querySelector("#usuarioEmail").value = perfil.email || "";
   form.querySelector("#usuarioTelefono").value = perfil.telefono || "";
-  form.querySelector("#usuarioDepartamento").value = perfil.departamento || "";
-  form.querySelector("#usuarioCiudad").value = perfil.ciudad || "";
   form.querySelector("#usuarioDireccion").value = perfil.direccion || "";
   form.querySelector("#usuarioRegimen").value = perfil.regimen || "";
 }
 
 function leerDatosFormularioUsuario(form) {
+  const select = form.querySelector("#usuarioTipoDocumento");
+  const selectedOption = select?.selectedOptions?.[0];
+  const paisSelect = form.querySelector("#usuarioPais");
+  const departamentoSelect = form.querySelector("#usuarioDepartamento");
+  const ciudadSelect = form.querySelector("#usuarioCiudad");
+  const paisOption = paisSelect?.selectedOptions?.[0];
+  const departamentoOption = departamentoSelect?.selectedOptions?.[0];
+  const ciudadOption = ciudadSelect?.selectedOptions?.[0];
+
   return {
-    tipoDocumento: form.querySelector("#usuarioTipoDocumento").value,
-    identificacion: form.querySelector("#usuarioIdentificacion").value.trim(),
-    nombres: form.querySelector("#usuarioNombres").value.trim(),
-    apellidos: form.querySelector("#usuarioApellidos").value.trim(),
+    idTipoDocumento: select?.value || "",
+    tipoDocumento:
+      selectedOption?.dataset?.descripcion ||
+      selectedOption?.textContent?.trim() ||
+      "",
+    codigoDian: selectedOption?.dataset?.codigoDian || "",
+    identificacion: getDocumentoEntidadOriginal(),
+    primerNombre: form.querySelector("#usuarioPrimerNombre").value.trim(),
+    segundoNombre: form.querySelector("#usuarioSegundoNombre").value.trim(),
+    primerApellido: form.querySelector("#usuarioPrimerApellido").value.trim(),
+    segundoApellido: form.querySelector("#usuarioSegundoApellido").value.trim(),
     email: form.querySelector("#usuarioEmail").value.trim(),
     telefono: form.querySelector("#usuarioTelefono").value.trim(),
-    departamento: form.querySelector("#usuarioDepartamento").value.trim(),
-    ciudad: form.querySelector("#usuarioCiudad").value.trim(),
+    idPais: paisSelect?.value || "",
+    idDepartamento: departamentoSelect?.value || "",
+    idCiudad: ciudadSelect?.value || "",
+    pais: paisOption?.textContent?.trim() || "",
+    departamento: departamentoOption?.textContent?.trim() || "",
+    ciudad: ciudadOption?.textContent?.trim() || "",
     direccion: form.querySelector("#usuarioDireccion").value.trim(),
     regimen: form.querySelector("#usuarioRegimen").value,
   };
@@ -738,7 +1106,6 @@ function abrirModalUsuario() {
     alertBox.classList.add("d-none");
   }
 
-  cargarFormularioUsuario();
   modalUsuarioInstance =
     modalUsuarioInstance || bootstrap.Modal.getOrCreateInstance(modalEl);
   modalUsuarioInstance.show();
@@ -762,7 +1129,7 @@ function restoreAccordionOpenState(openIds) {
   });
 }
 
-function refrescarResultados() {
+async function refrescarResultados() {
   if (!ultimaConsulta) return;
 
   const resultsBody = document.getElementById("resultsBody");
@@ -780,18 +1147,19 @@ function refrescarResultados() {
     return;
   }
 
-  consultarFacturaApi(numeroFactura, empresaId)
-    .then((data) => {
-      const datos = mapApiToViewModel(
-        data,
-        numeroFactura,
-        numeroNotaCredito,
-        esNotaCredito
-      );
-      renderFacturaResult(resultsBody, datos, esNotaCredito);
-      restoreAccordionOpenState(openPanels);
-    })
-    .catch(() => {});
+  try {
+    const data = await consultarFacturaApi(numeroFactura, empresaId);
+    const datos = mapApiToViewModel(
+      data,
+      numeroFactura,
+      numeroNotaCredito,
+      esNotaCredito
+    );
+    renderFacturaResult(resultsBody, datos, esNotaCredito);
+    restoreAccordionOpenState(openPanels);
+  } catch {
+    /* mantener vista actual */
+  }
 }
 
 function initModalUsuario() {
@@ -802,28 +1170,77 @@ function initModalUsuario() {
 
   const alertBox = document.getElementById("perfilUsuarioAlert");
 
+  if (isSessionActive()) {
+    cargarTiposDocumentoCatalogo().catch(() => {});
+    cargarPaisesCatalogo().catch(() => {});
+  }
+
   modalEl.addEventListener("show.bs.modal", cargarFormularioUsuario);
 
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
     const data = leerDatosFormularioUsuario(form);
+    const documentoOriginal = getDocumentoEntidadOriginal();
+    const submitBtn = modalEl.querySelector('[type="submit"][form="perfilUsuarioForm"]');
 
-    if (!data.identificacion || !data.nombres || !data.apellidos) {
+    if (!documentoOriginal) {
       showPerfilAlert(
         alertBox,
-        "Complete identificación, nombres y apellidos como mínimo.",
+        "Consulte una factura antes de editar el responsable.",
         "warning"
       );
       return;
     }
 
-    saveUsuarioPerfil(data);
-    refrescarResultados();
+    if (!data.idTipoDocumento) {
+      showPerfilAlert(alertBox, "Seleccione el tipo de documento.", "warning");
+      return;
+    }
 
-    modalUsuarioInstance =
-      modalUsuarioInstance || bootstrap.Modal.getOrCreateInstance(modalEl);
-    modalUsuarioInstance.hide();
+    if (!data.primerNombre || !data.primerApellido) {
+      showPerfilAlert(
+        alertBox,
+        "Complete primer nombre y primer apellido como mínimo.",
+        "warning"
+      );
+      return;
+    }
+
+    if (!data.idPais || !data.idDepartamento || !data.idCiudad) {
+      showPerfilAlert(
+        alertBox,
+        "Seleccione país, departamento y ciudad.",
+        "warning"
+      );
+      return;
+    }
+
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Guardando…";
+    }
+
+    try {
+      await guardarEntidadResponsableEnApi(documentoOriginal, data);
+      await refrescarResultados();
+      showPerfilAlert(alertBox, "Datos del responsable actualizados.", "success");
+
+      modalUsuarioInstance =
+        modalUsuarioInstance || bootstrap.Modal.getOrCreateInstance(modalEl);
+      modalUsuarioInstance.hide();
+    } catch (error) {
+      showPerfilAlert(
+        alertBox,
+        error.message || "No se pudo guardar los datos del responsable.",
+        "danger"
+      );
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Guardar cambios";
+      }
+    }
   });
 
   if (resultsBody) {
@@ -1105,7 +1522,7 @@ function xmlFileNameNotaCreditoHint(numeroNota, prefijoNC) {
 
 function mapApiToViewModel(data, numeroFactura, numeroNotaCredito, esNotaCredito) {
   const factura = data.factura || {};
-  const entidad = mergeEntidadConEdiciones(data.usuario);
+  const entidad = data.usuario || {};
   ultimaEntidadConsulta = entidad;
   const prefijoNC = factura.prefijoNC || "";
   const xmlFileName = esNotaCredito
@@ -1636,7 +2053,7 @@ function renderUsuarioSection(usuario) {
   const incompleto = isUsuarioIncompleto(usuario);
   const avisoIncompleto = incompleto
     ? `<div class="usuario-incompleto-banner">
-        <span>Faltan datos del usuario por completar.</span>
+        <span>Faltan datos del responsable por completar.</span>
         <button type="button" class="btn btn-link btn-editar-usuario p-0">Completar datos →</button>
       </div>`
     : "";
@@ -1644,9 +2061,12 @@ function renderUsuarioSection(usuario) {
   const fields = [
     { label: "Tipo de documento", value: displayValue(usuario.tipoDocumento) },
     { label: "Identificación", value: displayValue(usuario.identificacion) },
-    { label: "Nombres", value: displayValue(usuario.nombres) },
-    { label: "Apellidos", value: displayValue(usuario.apellidos) },
+    { label: "Primer nombre", value: displayValue(usuario.primerNombre) },
+    { label: "Segundo nombre", value: displayValue(usuario.segundoNombre) },
+    { label: "Primer apellido", value: displayValue(usuario.primerApellido) },
+    { label: "Segundo apellido", value: displayValue(usuario.segundoApellido) },
     { label: "E-mail", value: displayValue(usuario.email) },
+    { label: "País", value: displayValue(usuario.pais) },
     { label: "Departamento", value: displayValue(usuario.departamento) },
     { label: "Ciudad", value: displayValue(usuario.ciudad) },
     { label: "Dirección", value: displayValue(usuario.direccion) },
@@ -1658,7 +2078,7 @@ function renderUsuarioSection(usuario) {
     "Información del responsable",
     ICONS.usuario,
     `${avisoIncompleto}<div class="info-grid">${renderInfoGrid(fields)}</div>
-     <p class="mt-3 mb-0"><button type="button" class="btn btn-link btn-editar-usuario p-0">Editar datos del usuario</button></p>`,
+     <p class="mt-3 mb-0"><button type="button" class="btn btn-link btn-editar-usuario p-0">Editar datos del responsable</button></p>`,
     false
   );
 }
