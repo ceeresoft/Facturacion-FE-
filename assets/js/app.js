@@ -1,5 +1,3 @@
-import "../../lib/bootstrap/js/bootstrap.bundle.min.js";
-
 const bootstrap = window.bootstrap;
 const API_BASE_URL = String(window.APP_CONFIG?.apiBaseUrl ?? "").replace(
   /\/$/,
@@ -1104,7 +1102,7 @@ function leerDatosFormularioUsuario(form) {
 
 function abrirModalUsuario() {
   const modalEl = document.getElementById("modalEditarUsuario");
-  if (!modalEl) return;
+  if (!modalEl || !bootstrap?.Modal) return;
 
   const alertBox = document.getElementById("perfilUsuarioAlert");
   if (alertBox) {
