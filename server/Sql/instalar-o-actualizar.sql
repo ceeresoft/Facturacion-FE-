@@ -498,7 +498,7 @@ INNER JOIN dbo.EmpresaV
   ON dbo.Factura.[Id EmpresaV] = dbo.EmpresaV.[Id EmpresaV]
 INNER JOIN dbo.Entidad
   ON dbo.Factura.[Documento Paciente] = dbo.Entidad.[Documento Entidad]
-INNER JOIN dbo.[Plan de Tratamiento]
+LEFT OUTER JOIN dbo.[Plan de Tratamiento]
   ON dbo.Entidad.[Documento Entidad] = dbo.[Plan de Tratamiento].[Documento Paciente]
  AND dbo.FacturaII.[Id Plan de Tratamiento] = dbo.[Plan de Tratamiento].[Id Plan de Tratamiento]
 WHERE (dbo.EmpresaV.[Id Estado] = 7)
