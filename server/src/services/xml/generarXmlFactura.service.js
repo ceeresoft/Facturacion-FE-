@@ -28,6 +28,7 @@ export async function generarXmlFactura(numero, idEmpresaV, { guardarArchivo = t
     fileName,
     filePath,
     relativePath,
+    idFactura: data.factura.idFactura,
     numeroFactura: data.factura.numF,
     prefijo: data.factura.prefijoF,
     tipoFactura: data.tipoFactura,

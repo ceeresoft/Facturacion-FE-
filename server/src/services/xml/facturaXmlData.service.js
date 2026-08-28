@@ -168,7 +168,13 @@ export async function cargarDatosXmlFactura(numero, idEmpresaV) {
   const fechaFactura = facturaRow.FechaFactura;
   const fechaVencimiento = facturaRow.FechaVencimientoFactura;
 
+  const idFactura = Number(facturaRow.IdFactura);
+  if (!Number.isInteger(idFactura) || idFactura <= 0) {
+    throw new FacturaError("La factura no tiene IdFactura válido en BD", 500);
+  }
+
   const factura = {
+    idFactura,
     numF: folioSinCerosIzquierda(facturaRow.NroFactura),
     prefijoF: txt(facturaRow.PrefijoFactura),
     fechaF: formatDateYmd(fechaFactura),

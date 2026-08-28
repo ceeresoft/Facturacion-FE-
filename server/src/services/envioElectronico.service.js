@@ -13,16 +13,21 @@ import { ejecutarPaso, mensajePaso } from "../utils/feStepError.js";
 
 const DELAY_ENVIO_MS = Number.parseInt(process.env.FACTURATECH_ENVIO_DELAY_MS || "2000", 10);
 
-async function marcarFacturaEnviada(numeroFactura) {
+async function marcarFacturaEnviada(idFactura) {
+  const id = Number.parseInt(idFactura, 10);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new FacturaError("IdFactura inválido para actualizar el estado", 500);
+  }
+
   const pool = await getPool();
   const result = await pool
     .request()
     .input("estado", sql.Int, 1)
-    .input("numero", sql.NVarChar, String(numeroFactura).trim())
+    .input("idFactura", sql.Int, id)
     .query(`
       UPDATE dbo.Factura
       SET EstadoFacturaElectronica = @estado
-      WHERE RTRIM([No Factura]) = RTRIM(@numero)
+      WHERE [Id Factura] = @idFactura
     `);
 
   if (!result.rowsAffected[0]) {
@@ -113,7 +118,7 @@ export async function enviarFacturaElectronica(numero, idEmpresaV) {
     validarRespuestaEnvio(envio, "la factura");
 
     await ejecutarPaso("Paso 4: Actualizar estado en BD", () =>
-      marcarFacturaEnviada(generado.numeroFactura)
+      marcarFacturaEnviada(generado.idFactura)
     );
 
     return {
