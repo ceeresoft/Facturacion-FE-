@@ -170,6 +170,7 @@ AS
 SELECT DISTINCT
   f.[Id EmpresaV] AS IdEmpresaV,
   f.[No Factura] AS NroFactura,
+  f.[Id Factura] AS IdFactura,
   f.[Fecha Factura] AS FechaFactura,
   f.[Fecha Digitación Factura] AS FechaDigitacionFactura,
   f.[Iva Factura] AS TotalIvaFactura,

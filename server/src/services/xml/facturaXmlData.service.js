@@ -168,7 +168,16 @@ export async function cargarDatosXmlFactura(numero, idEmpresaV) {
   const fechaFactura = facturaRow.FechaFactura;
   const fechaVencimiento = facturaRow.FechaVencimientoFactura;
 
-  const idFactura = Number(facturaRow.IdFactura);
+  let idFactura = Number(facturaRow.IdFactura);
+  if (!Number.isInteger(idFactura) || idFactura <= 0) {
+    const idRow = await queryOne(
+      pool,
+      `SELECT [Id Factura] AS IdFactura FROM dbo.Factura
+       WHERE RTRIM([No Factura]) = RTRIM(@numero) AND [Id EmpresaV] = @idEmpresaV`,
+      params
+    );
+    idFactura = Number(idRow?.IdFactura);
+  }
   if (!Number.isInteger(idFactura) || idFactura <= 0) {
     throw new FacturaError("La factura no tiene IdFactura válido en BD", 500);
   }
