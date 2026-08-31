@@ -44,7 +44,23 @@ function isAllowedOrigin(origin) {
   if (!origin) return true;
   if (origin === corsOrigin) return true;
   if (origin === getApiBaseUrl()) return true;
-  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
+
+  // Mismo puerto que la API: acceso en red por nombre de equipo o IP (ej. http://servidor:3005)
+  if (serveFrontend) {
+    try {
+      const { port, protocol } = new URL(origin);
+      const apiPort = String(PORT);
+      const originPort = port || (protocol === "https:" ? "443" : "80");
+      if (originPort === apiPort) {
+        return true;
+      }
+    } catch {
+      // origen mal formado
+    }
+  }
+
+  return false;
 }
 
 app.use(
