@@ -26,7 +26,7 @@ function parseSections(text) {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const headerMatch = line.match(/^-- (\d+)\) (.+)$/);
+    const headerMatch = line.match(/^-- (\d+[a-z]*)\) (.+)$/);
     if (headerMatch && i > 0 && /^-{5,}$/.test(lines[i - 1])) {
       if (current) {
         current.body = current.bodyLines.join("\n").trim();

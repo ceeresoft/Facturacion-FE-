@@ -280,15 +280,24 @@ LEFT OUTER JOIN dbo.[Actividad Económica] AS ae
 INNER JOIN dbo.EntidadXX AS exx
   ON ae.[Id Actividad Económica] = exx.[Id Actividad Económica]
   ON e.[Documento Entidad] = exx.[Documento Entidad]
+GO
 
-CREATE VIEW [dbo].[Face Cnsta Cuotas]
+
+------------------------------------------------------------------------------
+-- VISTA: Face Cnsta Cuotas
+------------------------------------------------------------------------------
+CREATE OR ALTER VIEW [dbo].[Face Cnsta Cuotas]
 AS
 SELECT        [Id Cuotas Pactadas Inicial Tratamiento], [Capital Faltante Cuotas Pactadas Inicial Tratamiento], [Id Plan de Tratamiento Tratamientos]
 FROM            dbo.[Cuotas Pactadas Inicial Tratamiento]
 WHERE        ([Cuota Nro Cuotas Pactadas Inicial Tratamiento] = 1)
+GO
 
 
-CREATE VIEW [dbo].[Face Cnsta SumaTotalPresupuestoSInDesAdi]
+------------------------------------------------------------------------------
+-- VISTA: Face Cnsta SumaTotalPresupuestoSInDesAdi
+------------------------------------------------------------------------------
+CREATE OR ALTER VIEW [dbo].[Face Cnsta SumaTotalPresupuestoSInDesAdi]
 AS
 SELECT        dbo.[Plan de Tratamiento].[Nro Plan de Tratamiento], 
                         SUM(ROUND(dbo.[Plan de Tratamiento Items].[Valor Plan de Tratamiento Items] * dbo.[Plan de Tratamiento Items].[Cantidad Plan de Tratamiento Items] - CASE WHEN dbo.[Face Cnsta Cuotas].[Capital Faltante Cuotas Pactadas Inicial Tratamiento]
@@ -302,9 +311,13 @@ FROM            dbo.[Face Cnsta Cuotas] INNER JOIN
                         dbo.[Plan de Tratamiento Items] ON dbo.[Plan de Tratamiento].[Id Plan de Tratamiento] = dbo.[Plan de Tratamiento Items].[Id Plan de Tratamiento] ON 
                         dbo.[Plan de Tratamiento Tratamientos].[Id Plan de Tratamiento] = dbo.[Plan de Tratamiento].[Id Plan de Tratamiento]
 GROUP BY dbo.[Plan de Tratamiento].[Nro Plan de Tratamiento], dbo.[Plan de Tratamiento].[Id Plan de Tratamiento]
+GO
 
 
-CREATE VIEW [dbo].[Face Cnsta GuiaCuotasNoAnticipos]
+------------------------------------------------------------------------------
+-- VISTA: Face Cnsta GuiaCuotasNoAnticipos
+------------------------------------------------------------------------------
+CREATE OR ALTER VIEW [dbo].[Face Cnsta GuiaCuotasNoAnticipos]
 AS
 SELECT DISTINCT 
                         dbo.Factura.[No Factura], dbo.Factura.[Total Factura], CASE WHEN dbo.Factura.[Total Factura] = ValorTotalPresupuesto THEN 0 ELSE 1 END AS GuiaCuotasNoAnticipos, 
@@ -313,6 +326,36 @@ FROM            dbo.[Face Cnsta SumaTotalPresupuestoSInDesAdi] INNER JOIN
                         dbo.[Plan de Tratamiento] ON dbo.[Face Cnsta SumaTotalPresupuestoSInDesAdi].[Nro Plan de Tratamiento] = dbo.[Plan de Tratamiento].[Nro Plan de Tratamiento] INNER JOIN
                         dbo.Factura INNER JOIN
                         dbo.FacturaII ON dbo.Factura.[Id Factura] = dbo.FacturaII.[Id Factura] ON dbo.[Plan de Tratamiento].[Id Plan de Tratamiento] = dbo.FacturaII.[Id Plan de Tratamiento]
+GO
+
+
+------------------------------------------------------------------------------
+-- VISTA: Face Cnsta NumeroItems
+------------------------------------------------------------------------------
+CREATE OR ALTER VIEW [dbo].[Face Cnsta NumeroItems]
+AS
+SELECT
+  COUNT([Código Objeto]) AS CantidadItem,
+  [Id Plan de Tratamiento]
+FROM dbo.[Plan de Tratamiento Items]
+GROUP BY [Id Plan de Tratamiento]
+GO
+
+
+------------------------------------------------------------------------------
+-- VISTA: Face Cnsta GuiaCuotaInicial
+------------------------------------------------------------------------------
+CREATE OR ALTER VIEW [dbo].[Face Cnsta GuiaCuotaInicial]
+AS
+SELECT
+  dbo.[Face Cnsta NumeroItems].[Id Plan de Tratamiento],
+  MAX(CHARINDEX('Inicial', dbo.FacturaII.[Descripción FacturaII])) AS GuiaCuotaInicial
+FROM dbo.Factura
+INNER JOIN dbo.FacturaII
+  ON dbo.Factura.[Id Factura] = dbo.FacturaII.[Id Factura]
+LEFT OUTER JOIN dbo.[Face Cnsta NumeroItems]
+  ON dbo.FacturaII.[Id Plan de Tratamiento] = dbo.[Face Cnsta NumeroItems].[Id Plan de Tratamiento]
+GROUP BY dbo.[Face Cnsta NumeroItems].[Id Plan de Tratamiento], dbo.Factura.[No Factura]
 GO
 
 
@@ -452,6 +495,124 @@ GROUP BY
   dbo.[Plan de Tratamiento].[Nro Plan de Tratamiento],
   dbo.[Plan de Tratamiento].[Id Plan de Tratamiento]
 HAVING (dbo.EmpresaV.[Id Estado] = 7)
+GO
+
+
+------------------------------------------------------------------------------
+-- VISTA: Face Cnsta FacturaParticular
+------------------------------------------------------------------------------
+CREATE OR ALTER VIEW [dbo].[Face Cnsta FacturaParticular]
+AS
+SELECT TOP (100) PERCENT
+  ROUND((dbo.[Plan de Tratamiento Items].[Valor Plan de Tratamiento Items] - dbo.[Plan de Tratamiento Items].[Descuento $ Plan de Tratamiento Items])
+    * dbo.[Plan de Tratamiento Items].[Cantidad Plan de Tratamiento Items], 0) AS ValorTotalItemOld2,
+  ROUND(dbo.[Plan de Tratamiento Items].[Valor Plan de Tratamiento Items] * dbo.[Plan de Tratamiento Items].[Cantidad Plan de Tratamiento Items], 0) AS BaseItemDescuento2,
+  ROUND((dbo.[Plan de Tratamiento Items].[Valor Plan de Tratamiento Items] - dbo.[Plan de Tratamiento Items].[Descuento $ Plan de Tratamiento Items])
+    * dbo.[Plan de Tratamiento Items].[Cantidad Plan de Tratamiento Items], 0) AS BaseItemIva2,
+  ROUND(((dbo.[Plan de Tratamiento Items].[Valor Plan de Tratamiento Items] - dbo.[Plan de Tratamiento Items].[Descuento $ Plan de Tratamiento Items])
+    * dbo.[Plan de Tratamiento Items].[Cantidad Plan de Tratamiento Items]) * (dbo.[Plan de Tratamiento Items].[Valor Iva % Plan de Tratamiento Items] / 100), 0) AS ValorIvaItem2,
+  dbo.[Plan de Tratamiento Items].[Valor Plan de Tratamiento Items] AS ValorItem2,
+  dbo.[Plan de Tratamiento Items].[Valor Iva % Plan de Tratamiento Items] AS PorcentajeIvaItem2,
+  dbo.[Plan de Tratamiento Items].[Cantidad Plan de Tratamiento Items] AS CantidadItem2,
+  dbo.Objeto.[Descripción Objeto] AS DescripcionItem,
+  dbo.FacturaII.[Id FacturaII] AS IdFacturaItem,
+  dbo.Factura.[No Factura] AS NroFactura,
+  dbo.[Plan de Tratamiento Items].[Descuento $ Plan de Tratamiento Items] AS ValorDescuento2,
+  dbo.[Plan de Tratamiento Items].[Código Objeto] AS codigoObjetoItem,
+  dbo.Factura.[Id EmpresaV] AS IdEmpresaV,
+  dbo.EmpresaV.[Id Estado] AS IdEstadoEmpresaV,
+  dbo.[Plan de Tratamiento Items].[Descuento % Plan de Tratamiento Items] AS PorcentajeDescuentoItem2,
+  dbo.Entidad.[Nombre Completo Entidad] AS NombrePacienteEPS,
+  dbo.[Plan de Tratamiento].[Documento Paciente] AS DocumentoPacienteEPS,
+  dbo.[Plan de Tratamiento].[Nro Plan de Tratamiento],
+  dbo.FacturaII.[Descripción FacturaII],
+  ROUND((dbo.[Plan de Tratamiento Items].[Valor Plan de Tratamiento Items] * dbo.[Plan de Tratamiento Items].[Cantidad Plan de Tratamiento Items]
+    - CASE WHEN dbo.[Face Cnsta Cuotas].[Capital Faltante Cuotas Pactadas Inicial Tratamiento] > 0
+      THEN dbo.[Face Cnsta Cuotas].[Capital Faltante Cuotas Pactadas Inicial Tratamiento] ELSE 0 END)
+    + dbo.[Plan de Tratamiento Items].[Valor Plan de Tratamiento Items] * (dbo.[Plan de Tratamiento Items].[Valor Iva % Plan de Tratamiento Items] / 100), 0) AS ValorTotalMenosCopagoIva,
+  ROUND(dbo.[Plan de Tratamiento Items].[Valor Plan de Tratamiento Items] * dbo.[Plan de Tratamiento Items].[Cantidad Plan de Tratamiento Items]
+    - CASE WHEN dbo.[Face Cnsta Cuotas].[Capital Faltante Cuotas Pactadas Inicial Tratamiento] > 0
+      THEN dbo.[Face Cnsta Cuotas].[Capital Faltante Cuotas Pactadas Inicial Tratamiento] ELSE 0 END, 0) AS ValorTotalItem2,
+  CASE WHEN dbo.[Face Cnsta Cuotas].[Capital Faltante Cuotas Pactadas Inicial Tratamiento] > 0
+    THEN dbo.[Face Cnsta Cuotas].[Capital Faltante Cuotas Pactadas Inicial Tratamiento] ELSE 0 END
+    / (dbo.[Plan de Tratamiento Items].[Valor Plan de Tratamiento Items] * dbo.[Plan de Tratamiento Items].[Cantidad Plan de Tratamiento Items]
+    + dbo.[Plan de Tratamiento Items].[Valor Plan de Tratamiento Items] * (dbo.[Plan de Tratamiento Items].[Valor Iva % Plan de Tratamiento Items] / 100)) * 100 AS PorcentajeCopago,
+  dbo.[Face Cnsta NumeroItems].CantidadItem AS CantidadDeItems,
+  CASE WHEN dbo.[Face Cnsta Cuotas].[Capital Faltante Cuotas Pactadas Inicial Tratamiento] > 0
+    THEN dbo.[Face Cnsta Cuotas].[Capital Faltante Cuotas Pactadas Inicial Tratamiento] ELSE 0 END AS ValorDescuentoItem2,
+  CASE WHEN dbo.[Face Cnsta Cuotas].[Capital Faltante Cuotas Pactadas Inicial Tratamiento] > 0
+    THEN dbo.[Face Cnsta Cuotas].[Capital Faltante Cuotas Pactadas Inicial Tratamiento] ELSE 1 END AS Total,
+  ROUND(dbo.FacturaII.[Valor FacturaII] * dbo.FacturaII.[Cantidad FacturaII] - dbo.FacturaII.[Descuento $ FacturaII], 0) AS ValorTotalItem,
+  ROUND(dbo.FacturaII.[Valor FacturaII] * dbo.FacturaII.[Cantidad FacturaII], 0) AS BaseItemDescuento,
+  ROUND(dbo.FacturaII.[Valor FacturaII] * dbo.FacturaII.[Cantidad FacturaII] - dbo.FacturaII.[Descuento $ FacturaII], 0) AS BaseItemIva,
+  dbo.FacturaII.[Valor Iva $ FacturaII] AS ValorIvaItem,
+  dbo.FacturaII.[Valor FacturaII] AS ValorItem,
+  dbo.FacturaII.[Valor Iva % FacturaII] AS PorcentajeIvaItem,
+  dbo.FacturaII.[Cantidad FacturaII] AS CantidadItem,
+  dbo.FacturaII.[Descuento $ FacturaII] AS ValorDescuentoItem,
+  dbo.FacturaII.[Descuento % FacturaII] AS PorcentajeDescuentoItem,
+  Entidad_1.[Nombre Completo Entidad] AS Vendedor
+FROM dbo.FacturaII
+INNER JOIN dbo.Factura
+  ON dbo.FacturaII.[Id Factura] = dbo.Factura.[Id Factura]
+INNER JOIN dbo.EmpresaV
+  ON dbo.Factura.[Id EmpresaV] = dbo.EmpresaV.[Id EmpresaV]
+LEFT OUTER JOIN dbo.[Plan de Tratamiento]
+  ON dbo.FacturaII.[Id Plan de Tratamiento] = dbo.[Plan de Tratamiento].[Id Plan de Tratamiento]
+LEFT OUTER JOIN dbo.Entidad
+  ON dbo.[Plan de Tratamiento].[Documento Paciente] = dbo.Entidad.[Documento Entidad]
+LEFT OUTER JOIN dbo.[Plan de Tratamiento Items]
+  ON dbo.[Plan de Tratamiento].[Id Plan de Tratamiento] = dbo.[Plan de Tratamiento Items].[Id Plan de Tratamiento]
+LEFT OUTER JOIN dbo.Objeto
+  ON dbo.[Plan de Tratamiento Items].[Código Objeto] = dbo.Objeto.[Código Objeto]
+LEFT OUTER JOIN dbo.[Plan de Tratamiento Tratamientos]
+  ON dbo.[Plan de Tratamiento].[Id Plan de Tratamiento] = dbo.[Plan de Tratamiento Tratamientos].[Id Plan de Tratamiento]
+LEFT OUTER JOIN dbo.[Face Cnsta NumeroItems]
+  ON dbo.[Plan de Tratamiento Items].[Id Plan de Tratamiento] = dbo.[Face Cnsta NumeroItems].[Id Plan de Tratamiento]
+LEFT OUTER JOIN dbo.Entidad AS Entidad_1
+  ON dbo.Factura.[Documento Vendedor] = Entidad_1.[Documento Entidad]
+LEFT OUTER JOIN dbo.[Face Cnsta Cuotas]
+  ON dbo.[Plan de Tratamiento Tratamientos].[Id Plan de Tratamiento Tratamientos] = dbo.[Face Cnsta Cuotas].[Id Plan de Tratamiento Tratamientos]
+WHERE (dbo.EmpresaV.[Id Estado] = 7)
+GO
+
+
+------------------------------------------------------------------------------
+-- VISTA: Face Cnsta FacturaSaldos
+------------------------------------------------------------------------------
+CREATE OR ALTER VIEW [dbo].[Face Cnsta FacturaSaldos]
+AS
+SELECT DISTINCT
+  ROUND(dbo.FacturaII.[Valor FacturaII] * dbo.FacturaII.[Cantidad FacturaII] - dbo.FacturaII.[Descuento $ FacturaII], 0) AS ValorTotalItem,
+  ROUND(dbo.FacturaII.[Valor FacturaII] * dbo.FacturaII.[Cantidad FacturaII], 0) AS BaseItemDescuento,
+  ROUND(dbo.FacturaII.[Valor FacturaII] * dbo.FacturaII.[Cantidad FacturaII] - dbo.FacturaII.[Descuento $ FacturaII], 0) AS BaseItemIva,
+  dbo.FacturaII.[Valor Iva $ FacturaII] AS ValorIvaItem,
+  dbo.FacturaII.[Valor FacturaII] AS ValorItem,
+  dbo.FacturaII.[Valor Iva % FacturaII] AS PorcentajeIvaItem,
+  dbo.FacturaII.[Cantidad FacturaII] AS CantidadItem,
+  dbo.FacturaII.[Descripción FacturaII] AS DescripcionItemVieja,
+  dbo.FacturaII.[Id FacturaII] AS IdFacturaItem,
+  dbo.Factura.[No Factura] AS NroFactura,
+  dbo.FacturaII.[Descuento $ FacturaII] AS ValorDescuentoItem,
+  dbo.FacturaII.[Código Objeto] AS codigoObjetoItem,
+  dbo.Factura.[Id EmpresaV] AS IdEmpresaV,
+  dbo.EmpresaV.[Id Estado] AS IdEstadoEmpresaV,
+  dbo.FacturaII.[Descuento % FacturaII] AS PorcentajeDescuentoItem,
+  dbo.Entidad.[Nombre Completo Entidad] AS Vendedor,
+  dbo.FacturaII.[Descripción FacturaII] AS DescripcionItem
+FROM dbo.Tratamiento
+INNER JOIN dbo.[Saldo Entidad]
+  ON dbo.Tratamiento.[Id Tratamiento] = dbo.[Saldo Entidad].[Id Tratamiento]
+INNER JOIN dbo.FacturaII
+INNER JOIN dbo.Factura
+  ON dbo.FacturaII.[Id Factura] = dbo.Factura.[Id Factura]
+INNER JOIN dbo.EmpresaV
+  ON dbo.Factura.[Id EmpresaV] = dbo.EmpresaV.[Id EmpresaV]
+INNER JOIN dbo.Entidad
+  ON dbo.Factura.[Documento Paciente] = dbo.Entidad.[Documento Entidad]
+INNER JOIN dbo.[Face Cnsta TipoDeFactura]
+  ON dbo.Factura.[No Factura] = dbo.[Face Cnsta TipoDeFactura].NroFactura
+  ON dbo.[Saldo Entidad].[Nro Saldo Entidad] = dbo.[Face Cnsta TipoDeFactura].NumeroSaldo
 GO
 
 

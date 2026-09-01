@@ -17,10 +17,10 @@ Ver también: `README.md` (estructura de carpetas y orden de ejecución)
 | Carpeta | Archivo | Contenido |
 |---------|---------|-----------|
 | `alters/` | `columnas.sql` | `ALTER TABLE` — `EstadoFacturaElectronica`, `EstadoFace`, `codigoDian` |
-| `alters/` | `vistas-drop-create.sql` | `DROP VIEW` + `CREATE VIEW` (23 vistas) |
-| `alters/` | `vistas-create-or-alter.sql` | `CREATE OR ALTER VIEW` (23 vistas) |
+| `alters/` | `vistas-drop-create.sql` | `DROP VIEW` + `CREATE VIEW` (30 vistas) |
+| `alters/` | `vistas-create-or-alter.sql` | `CREATE OR ALTER VIEW` (30 vistas) |
 | `creates/` | `tablas.sql` | `CREATE TABLE` IF NOT EXISTS (5 tablas) |
-| `creates/` | `vistas.sql` | `CREATE VIEW` puro (23 vistas) |
+| `creates/` | `vistas.sql` | `CREATE VIEW` puro (30 vistas) |
 | `updates/` | `catalogos.sql` | INSERT `Tipo Empresa`, UPDATE `codigoDian` |
 
 ## Validación vs código Node (`server/src`)
@@ -41,16 +41,9 @@ Ver también: `README.md` (estructura de carpetas y orden de ejecución)
 | `[Tipo de Documento]` | catálogo |
 | `ConfiguracionFace` | XML factura/NC |
 
-### Vistas (23) — en `creates/vistas.sql` y `alters/`
+### Vistas (30) — en `creates/vistas.sql` y `alters/`
 
-Todas las vistas usadas por el backend están incluidas. `[Face Cnsta Factura]` incluye **`IdFactura`**.
-
-### Vistas usadas pero NO en scripts (2)
-
-| Vista | Cuándo |
-|-------|--------|
-| `Face Cnsta FacturaParticular` | Tipo factura particular |
-| `Face Cnsta FacturaSaldos` | Facturas con saldos |
+Todas las vistas usadas por el backend están incluidas, incluyendo **`Face Cnsta FacturaParticular`**, **`Face Cnsta FacturaSaldos`**, **`Face Cnsta NumeroItems`** y **`Face Cnsta GuiaCuotaInicial`**. `[Face Cnsta Factura]` incluye **`IdFactura`**.
 
 ### Tablas base Face (deben existir en CeereSio)
 
