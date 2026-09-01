@@ -91,10 +91,35 @@ function formatArchivoXml(data) {
   return `xml/${nombre}`;
 }
 
-function getFeResultadoTitulo(data, esNotaCredito) {
-  if (data?.modo === "solo_xml") return "XML generado";
-  if (data?.enviado === false) return "XML generado";
-  return esNotaCredito ? "Nota crédito enviada" : "Factura enviada";
+function getFeExitoTitulo(data, esNotaCredito) {
+  if (data?.modo === "solo_xml" || data?.enviado === false) {
+    return esNotaCredito ? "¡XML de Nota Crédito Generado!" : "¡XML Generado con Éxito!";
+  }
+  return esNotaCredito
+    ? "¡Nota Crédito Enviada con Éxito!"
+    : "¡Factura Electrónica Enviada con Éxito!";
+}
+
+function getFeExitoResumen(data, esNotaCredito, docNumero) {
+  const enviado = Boolean(data?.enviado) && data?.modo === "enviar";
+  if (enviado) {
+    return esNotaCredito
+      ? `La nota crédito número ${docNumero} fue enviada correctamente.`
+      : `La factura número ${docNumero} fue enviada correctamente.`;
+  }
+  return esNotaCredito
+    ? `El XML de la nota crédito número ${docNumero} se generó correctamente.`
+    : `El XML de la factura número ${docNumero} se generó correctamente.`;
+}
+
+function feExitoIcon(tipo) {
+  const icons = {
+    file: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`,
+    cloud: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>`,
+    shield: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg>`,
+    info: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>`,
+  };
+  return icons[tipo] || icons.info;
 }
 
 function buildFeResultadoHtml(data, { esNotaCredito, numeroFactura, numeroNotaCredito, compact = false } = {}) {
@@ -104,86 +129,205 @@ function buildFeResultadoHtml(data, { esNotaCredito, numeroFactura, numeroNotaCr
   const docNumero = esNotaCredito
     ? numeroNotaCredito || data?.numeroNotaCredito
     : numeroFactura;
-  const docLabel = esNotaCredito ? "Nota crédito" : "Factura";
   const pasos = [];
 
   if (archivo) {
     pasos.push({
-      titulo: "XML generado y guardado",
-      detalle: archivo,
-      estado: "ok",
+      paso: "Paso 1",
+      icono: "file",
+      texto: `XML guardado en ${archivo}`,
     });
   }
 
   if (enviado) {
-    const facturatechDetalle = [
-      data?.code != null ? `Código ${data.code}` : null,
-      data?.transaccionID ? `Transacción ${data.transaccionID}` : null,
-    ]
-      .filter(Boolean)
-      .join(" · ");
-
     pasos.push({
-      titulo: "Enviado a Facturatech",
-      detalle: facturatechDetalle || "Respuesta recibida correctamente",
-      estado: "ok",
+      paso: "Paso 3",
+      icono: "cloud",
+      texto: `Facturatech code ${data?.code ?? "—"}, transaccionID ${data?.transaccionID ?? "—"}`,
     });
     pasos.push({
-      titulo: "Estado actualizado en base de datos",
-      detalle: esNotaCredito
-        ? "Campo EstadoFace registrado"
-        : "Campo EstadoFacturaElectronica registrado",
-      estado: "ok",
+      paso: "Paso 4",
+      icono: "shield",
+      texto: esNotaCredito
+        ? "EstadoFace actualizado"
+        : "EstadoFacturaElectronica actualizado",
     });
   } else if (soloXml) {
     pasos.push({
-      titulo: "Envío a Facturatech omitido",
-      detalle: esNotaCredito
-        ? "Modo FE_NOTA_CREDITO_MODO=solo_xml"
-        : "Modo FE_FACTURA_MODO=solo_xml",
-      estado: "info",
+      paso: "Paso 2-4",
+      icono: "info",
+      texto: esNotaCredito
+        ? "Envío omitido (FE_NOTA_CREDITO_MODO=solo_xml)"
+        : "Envío omitido (FE_FACTURA_MODO=solo_xml)",
     });
   }
 
-  const heroTitulo = enviado
-    ? `${docLabel} N° ${escapeHtml(docNumero)} enviada`
-    : `${docLabel} N° ${escapeHtml(docNumero)} — XML listo`;
-  const heroSub = enviado
-    ? "El proceso de facturación electrónica se completó correctamente."
-    : "El archivo XML se generó y guardó en el servidor.";
+  const detallesTecnicos = [
+    archivo ? `[Paso 1] XML guardado en ${archivo}` : null,
+    enviado && data?.code != null
+      ? `[Paso 3] Facturatech code ${data.code}, transaccionID ${data.transaccionID ?? "—"}`
+      : null,
+    enviado
+      ? `[Paso 4] ${esNotaCredito ? "EstadoFace" : "EstadoFacturaElectronica"} actualizado`
+      : null,
+    data?.modo ? `Modo: ${data.modo}` : null,
+    data?.message ? `Mensaje servidor: ${data.message}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
 
-  const iconSvg = enviado
-    ? `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`
-    : `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`;
+  if (compact) {
+    const pasosHtml = pasos
+      .map(
+        (paso) => `
+        <li class="fe-exito-step fe-exito-step--compact">
+          <span class="fe-exito-step-icon fe-exito-step-icon--${paso.icono}">${feExitoIcon(paso.icono)}</span>
+          <span class="fe-exito-step-text"><strong>[${escapeHtml(paso.paso)}]</strong> ${escapeHtml(paso.texto)}</span>
+        </li>`
+      )
+      .join("");
+
+    return `
+      <div class="fe-exito fe-exito--compact">
+        <p class="fe-exito-compact-title">${escapeHtml(getFeExitoResumen(data, esNotaCredito, docNumero))}</p>
+        <ul class="fe-exito-timeline fe-exito-timeline--compact">${pasosHtml}</ul>
+      </div>`;
+  }
 
   const pasosHtml = pasos
     .map(
-      (paso, index) => `
-      <li class="fe-resultado-paso fe-resultado-paso--${paso.estado}">
-        <span class="fe-resultado-paso-num" aria-hidden="true">${index + 1}</span>
-        <div class="fe-resultado-paso-body">
-          <strong class="fe-resultado-paso-titulo">${escapeHtml(paso.titulo)}</strong>
-          <span class="fe-resultado-paso-detalle">${escapeHtml(paso.detalle)}</span>
+      (paso) => `
+      <li class="fe-exito-step">
+        <span class="fe-exito-step-icon fe-exito-step-icon--${paso.icono}">${feExitoIcon(paso.icono)}</span>
+        <div class="fe-exito-step-body">
+          <span class="fe-exito-step-label">[${escapeHtml(paso.paso)}]</span>
+          <span class="fe-exito-step-text">${escapeHtml(paso.texto)}</span>
         </div>
       </li>`
     )
     .join("");
 
   return `
-    <div class="fe-resultado ${enviado ? "fe-resultado--enviado" : "fe-resultado--xml"}${compact ? " fe-resultado--compact" : ""}">
-      <div class="fe-resultado-hero">
-        <div class="fe-resultado-icon" aria-hidden="true">${iconSvg}</div>
-        <div class="fe-resultado-hero-text">
-          <p class="fe-resultado-hero-titulo">${heroTitulo}</p>
-          <p class="fe-resultado-hero-sub">${heroSub}</p>
-        </div>
+    <div class="fe-exito">
+      <div class="fe-exito-badge" aria-hidden="true">
+        <span class="fe-exito-badge-ring"></span>
+        <span class="fe-exito-badge-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </span>
       </div>
+      <h2 class="fe-exito-title">${escapeHtml(getFeExitoTitulo(data, esNotaCredito))}</h2>
       ${
         pasos.length
-          ? `<ol class="fe-resultado-pasos">${pasosHtml}</ol>`
+          ? `<ul class="fe-exito-timeline">${pasosHtml}</ul>`
+          : ""
+      }
+      <div class="fe-exito-resumen">${escapeHtml(getFeExitoResumen(data, esNotaCredito, docNumero))}</div>
+      ${
+        archivo
+          ? `<div class="fe-exito-archivo">
+              <span>Archivo guardado en:</span>
+              <button type="button" class="fe-exito-link" data-fe-copy-path>Abrir Ubicación</button>
+              <code class="fe-exito-path" data-fe-path>${escapeHtml(archivo)}</code>
+            </div>`
+          : ""
+      }
+      ${
+        detallesTecnicos
+          ? `<details class="fe-exito-detalles">
+              <summary>Detalles Técnicos</summary>
+              <pre>${escapeHtml(detallesTecnicos)}</pre>
+            </details>`
           : ""
       }
     </div>`;
+}
+
+function resetModalRespuestaLayout() {
+  const modalEl = document.getElementById("modalRespuesta");
+  if (!modalEl) return;
+
+  modalEl.querySelector(".modal-header")?.classList.remove("d-none");
+  modalEl.querySelector(".modal-dialog")?.classList.remove("modal-dialog-fe-exito");
+  modalEl.querySelector(".modal-content")?.classList.remove(
+    "modal-fe-exito-content",
+    "modal-respuesta--success",
+    "modal-respuesta--error",
+    "modal-respuesta--warning"
+  );
+
+  const footerEl = modalEl.querySelector(".modal-footer");
+  if (footerEl) {
+    footerEl.className = "modal-footer";
+    footerEl.innerHTML =
+      '<button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>';
+  }
+}
+
+function showFeExitoModal(data, { esNotaCredito, numeroFactura, numeroNotaCredito, prefijoFactura = "" } = {}) {
+  ensureModalesMensajes();
+  resetModalRespuestaLayout();
+
+  const modalEl = document.getElementById("modalRespuesta");
+  const bodyEl = document.getElementById("modalRespuestaBody");
+  const headerEl = modalEl?.querySelector(".modal-header");
+  const footerEl = modalEl?.querySelector(".modal-footer");
+  const dialogEl = modalEl?.querySelector(".modal-dialog");
+  const contentEl = modalEl?.querySelector(".modal-content");
+
+  if (!modalEl || !bodyEl || !footerEl) return;
+
+  headerEl?.classList.add("d-none");
+  dialogEl?.classList.add("modal-dialog-fe-exito");
+  contentEl?.classList.add("modal-fe-exito-content", "modal-respuesta--success");
+
+  bodyEl.className = "respuesta-mensaje respuesta-success respuesta-html";
+  bodyEl.innerHTML = buildFeResultadoHtml(data, {
+    esNotaCredito,
+    numeroFactura,
+    numeroNotaCredito,
+  });
+
+  footerEl.className = "modal-footer modal-footer-fe-exito";
+  footerEl.innerHTML = `
+    <button type="button" class="btn btn-fe-exito-secondary" data-bs-dismiss="modal">Cerrar</button>
+    <button type="button" class="btn btn-fe-exito-muted" disabled title="Próximamente">Ver Siguiente</button>
+    ${
+      !esNotaCredito
+        ? '<button type="button" class="btn btn-fe-exito-primary" data-fe-ver-factura>Ver Factura</button>'
+        : '<button type="button" class="btn btn-fe-exito-primary" data-bs-dismiss="modal">Continuar</button>'
+    }`;
+
+  footerEl.querySelector("[data-fe-ver-factura]")?.addEventListener("click", () => {
+    modalRespuestaInstance?.hide();
+    verPdfFactura(numeroFactura, prefijoFactura);
+  });
+
+  bodyEl.querySelector("[data-fe-copy-path]")?.addEventListener("click", async (event) => {
+    const path = bodyEl.querySelector("[data-fe-path]")?.textContent?.trim();
+    if (!path) return;
+
+    try {
+      await navigator.clipboard.writeText(path);
+      const btn = event.currentTarget;
+      const prev = btn.textContent;
+      btn.textContent = "¡Copiado!";
+      window.setTimeout(() => {
+        btn.textContent = prev;
+      }, 1800);
+    } catch {
+      showRespuesta(`Ruta del archivo:\n${path}`, { tipo: "info", titulo: "Ubicación XML" });
+    }
+  });
+
+  const onHidden = () => {
+    resetModalRespuestaLayout();
+    modalEl.removeEventListener("hidden.bs.modal", onHidden);
+  };
+  modalEl.addEventListener("hidden.bs.modal", onHidden);
+
+  modalRespuestaInstance =
+    modalRespuestaInstance || bootstrap.Modal.getOrCreateInstance(modalEl);
+  modalRespuestaInstance.show();
 }
 
 function ensureModalesMensajes() {
@@ -254,6 +398,7 @@ function ensureModalesMensajes() {
 
 function showRespuesta(message, { titulo = "Respuesta", tipo = "info", html = false } = {}) {
   ensureModalesMensajes();
+  resetModalRespuestaLayout();
 
   const modalEl = document.getElementById("modalRespuesta");
   const bodyEl = document.getElementById("modalRespuestaBody");
@@ -1911,7 +2056,8 @@ async function procesarFeDesdeConsulta() {
   );
 
   try {
-    const { numeroFactura, numeroNotaCredito, empresaId, cufe } = ultimaConsulta;
+    const { numeroFactura, numeroNotaCredito, empresaId, cufe, prefijoFactura = "" } =
+      ultimaConsulta;
     const endpoint = esNotaCredito
       ? `/api/notas-credito/${encodeURIComponent(numeroNotaCredito)}/enviar?empresaId=${encodeURIComponent(empresaId)}&numeroFactura=${encodeURIComponent(numeroFactura)}`
       : `/api/facturas/${encodeURIComponent(numeroFactura)}/enviar?empresaId=${encodeURIComponent(empresaId)}`;
@@ -1933,13 +2079,6 @@ async function procesarFeDesdeConsulta() {
       throw new Error(data.message || "No se pudo procesar el documento");
     }
 
-    const resultadoHtml = buildFeResultadoHtml(data, {
-      esNotaCredito,
-      numeroFactura,
-      numeroNotaCredito,
-    });
-    const tituloExito = getFeResultadoTitulo(data, esNotaCredito);
-
     setFeProcesarStatus(
       buildFeResultadoHtml(data, {
         esNotaCredito,
@@ -1950,10 +2089,11 @@ async function procesarFeDesdeConsulta() {
       "success",
       { html: true }
     );
-    showRespuesta(resultadoHtml, {
-      tipo: "success",
-      titulo: tituloExito,
-      html: true,
+    showFeExitoModal(data, {
+      esNotaCredito,
+      numeroFactura,
+      numeroNotaCredito,
+      prefijoFactura,
     });
   } catch (error) {
     const mensaje = error.message || "Error al procesar el documento electrónico.";
@@ -2052,6 +2192,7 @@ function initBuscarFactura() {
         numeroNotaCredito,
         esNotaCredito,
         empresaId: resolucion,
+        prefijoFactura: data.factura?.prefijo || "",
         cufe: null,
         xmlFileName:
           datos.xmlFileName ||
