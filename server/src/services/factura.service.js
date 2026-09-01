@@ -184,6 +184,7 @@ export async function consultarFacturasPorUsuario(documentoUsuario, idEmpresaV) 
       FROM face_facturaPorUsuario
       WHERE [Documento Usuario] = @documento
         AND IdEmpresaV = @idEmpresaV
+        AND EstadoFacturaElectronica IS NULL
       ORDER BY [Fecha Factura] DESC
     `);
 

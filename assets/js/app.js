@@ -1763,6 +1763,32 @@ async function cargarFacturasPorResolucion(idEmpresaV) {
   }
 }
 
+async function refrescarListaTrasEnvioExitoso({
+  empresaId,
+  numeroFactura,
+  esNotaCredito,
+  enviado,
+}) {
+  if (!enviado || !empresaId || esNotaCredito) return;
+
+  const select = document.getElementById("numeroFactura");
+  if (select && numeroFactura) {
+    [...select.options]
+      .filter((opt) => opt.value === String(numeroFactura))
+      .forEach((opt) => opt.remove());
+
+    if (select.value === String(numeroFactura)) {
+      select.selectedIndex = 0;
+    }
+  }
+
+  await cargarFacturasPorResolucion(empresaId);
+
+  ultimaConsulta = null;
+  const resultsBody = document.getElementById("resultsBody");
+  resetResultsEmpty(resultsBody, false);
+}
+
 async function consultarFacturaApi(numeroFactura, empresaId) {
   const response = await apiFetch(
     `/api/facturas/${encodeURIComponent(numeroFactura)}?empresaId=${encodeURIComponent(empresaId)}`
@@ -2094,6 +2120,13 @@ async function procesarFeDesdeConsulta() {
       numeroFactura,
       numeroNotaCredito,
       prefijoFactura,
+    });
+
+    await refrescarListaTrasEnvioExitoso({
+      empresaId,
+      numeroFactura,
+      esNotaCredito,
+      enviado: data.enviado,
     });
   } catch (error) {
     const mensaje = error.message || "Error al procesar el documento electrónico.";
