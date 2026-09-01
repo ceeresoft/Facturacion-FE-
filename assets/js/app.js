@@ -84,6 +84,108 @@ function formatMensajeRespuesta(raw) {
     .replace(/\[Paso[^\]]+\]/g, (match) => `<strong>${match}</strong>`);
 }
 
+function formatArchivoXml(data) {
+  const ruta = data?.relativePath || data?.fileName;
+  if (!ruta) return null;
+  const nombre = String(ruta).replace(/^xml\//, "");
+  return `xml/${nombre}`;
+}
+
+function getFeResultadoTitulo(data, esNotaCredito) {
+  if (data?.modo === "solo_xml") return "XML generado";
+  if (data?.enviado === false) return "XML generado";
+  return esNotaCredito ? "Nota crédito enviada" : "Factura enviada";
+}
+
+function buildFeResultadoHtml(data, { esNotaCredito, numeroFactura, numeroNotaCredito, compact = false } = {}) {
+  const archivo = formatArchivoXml(data);
+  const enviado = Boolean(data?.enviado) && data?.modo === "enviar";
+  const soloXml = data?.modo === "solo_xml";
+  const docNumero = esNotaCredito
+    ? numeroNotaCredito || data?.numeroNotaCredito
+    : numeroFactura;
+  const docLabel = esNotaCredito ? "Nota crédito" : "Factura";
+  const pasos = [];
+
+  if (archivo) {
+    pasos.push({
+      titulo: "XML generado y guardado",
+      detalle: archivo,
+      estado: "ok",
+    });
+  }
+
+  if (enviado) {
+    const facturatechDetalle = [
+      data?.code != null ? `Código ${data.code}` : null,
+      data?.transaccionID ? `Transacción ${data.transaccionID}` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
+    pasos.push({
+      titulo: "Enviado a Facturatech",
+      detalle: facturatechDetalle || "Respuesta recibida correctamente",
+      estado: "ok",
+    });
+    pasos.push({
+      titulo: "Estado actualizado en base de datos",
+      detalle: esNotaCredito
+        ? "Campo EstadoFace registrado"
+        : "Campo EstadoFacturaElectronica registrado",
+      estado: "ok",
+    });
+  } else if (soloXml) {
+    pasos.push({
+      titulo: "Envío a Facturatech omitido",
+      detalle: esNotaCredito
+        ? "Modo FE_NOTA_CREDITO_MODO=solo_xml"
+        : "Modo FE_FACTURA_MODO=solo_xml",
+      estado: "info",
+    });
+  }
+
+  const heroTitulo = enviado
+    ? `${docLabel} N° ${escapeHtml(docNumero)} enviada`
+    : `${docLabel} N° ${escapeHtml(docNumero)} — XML listo`;
+  const heroSub = enviado
+    ? "El proceso de facturación electrónica se completó correctamente."
+    : "El archivo XML se generó y guardó en el servidor.";
+
+  const iconSvg = enviado
+    ? `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`
+    : `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`;
+
+  const pasosHtml = pasos
+    .map(
+      (paso, index) => `
+      <li class="fe-resultado-paso fe-resultado-paso--${paso.estado}">
+        <span class="fe-resultado-paso-num" aria-hidden="true">${index + 1}</span>
+        <div class="fe-resultado-paso-body">
+          <strong class="fe-resultado-paso-titulo">${escapeHtml(paso.titulo)}</strong>
+          <span class="fe-resultado-paso-detalle">${escapeHtml(paso.detalle)}</span>
+        </div>
+      </li>`
+    )
+    .join("");
+
+  return `
+    <div class="fe-resultado ${enviado ? "fe-resultado--enviado" : "fe-resultado--xml"}${compact ? " fe-resultado--compact" : ""}">
+      <div class="fe-resultado-hero">
+        <div class="fe-resultado-icon" aria-hidden="true">${iconSvg}</div>
+        <div class="fe-resultado-hero-text">
+          <p class="fe-resultado-hero-titulo">${heroTitulo}</p>
+          <p class="fe-resultado-hero-sub">${heroSub}</p>
+        </div>
+      </div>
+      ${
+        pasos.length
+          ? `<ol class="fe-resultado-pasos">${pasosHtml}</ol>`
+          : ""
+      }
+    </div>`;
+}
+
 function ensureModalesMensajes() {
   if (document.getElementById("modalRespuesta")) return;
 
@@ -150,26 +252,38 @@ function ensureModalesMensajes() {
   });
 }
 
-function showRespuesta(message, { titulo = "Respuesta", tipo = "info" } = {}) {
+function showRespuesta(message, { titulo = "Respuesta", tipo = "info", html = false } = {}) {
   ensureModalesMensajes();
 
   const modalEl = document.getElementById("modalRespuesta");
   const bodyEl = document.getElementById("modalRespuestaBody");
   const titleEl = document.getElementById("modalRespuestaLabel");
+  const contentEl = modalEl?.querySelector(".modal-content");
 
   if (!modalEl || !bodyEl) {
-    window.alert(message);
+    window.alert(html ? "Operación completada." : message);
     return;
   }
 
-  const pasoMatch = String(message ?? "").match(/^\[([^\]]+)\]/);
+  const pasoMatch = !html && String(message ?? "").match(/^\[([^\]]+)\]/);
   if (pasoMatch && titulo === "Respuesta") {
     titulo = `Error en ${pasoMatch[1]}`;
   }
 
   if (titleEl) titleEl.textContent = titulo;
-  bodyEl.className = `respuesta-mensaje respuesta-${tipo}`;
-  bodyEl.innerHTML = formatMensajeRespuesta(message);
+  bodyEl.className = html
+    ? `respuesta-mensaje respuesta-${tipo} respuesta-html`
+    : `respuesta-mensaje respuesta-${tipo}`;
+  bodyEl.innerHTML = html ? message : formatMensajeRespuesta(message);
+
+  contentEl?.classList.remove(
+    "modal-respuesta--success",
+    "modal-respuesta--error",
+    "modal-respuesta--warning"
+  );
+  if (tipo === "success") contentEl?.classList.add("modal-respuesta--success");
+  if (tipo === "error") contentEl?.classList.add("modal-respuesta--error");
+  if (tipo === "warning") contentEl?.classList.add("modal-respuesta--warning");
 
   modalRespuestaInstance =
     modalRespuestaInstance || bootstrap.Modal.getOrCreateInstance(modalEl);
@@ -1723,7 +1837,7 @@ function getHintProcesarFe(esNotaCredito) {
   return `Modo ${varName}=enviar: genera XML, envía a Facturatech y actualiza BD.`;
 }
 
-function setFeProcesarStatus(message, tipo = "info") {
+function setFeProcesarStatus(message, tipo = "info", { html = false } = {}) {
   const el = document.getElementById("feProcesarStatus");
   if (!el) return;
 
@@ -1743,7 +1857,8 @@ function setFeProcesarStatus(message, tipo = "info") {
           : "alert-info";
 
   el.className = "fe-procesar-status mt-2";
-  el.innerHTML = `<div class="alert ${alertClass} mb-0 text-start" role="alert">${formatMensajeRespuesta(message)}</div>`;
+  const contenido = html ? message : formatMensajeRespuesta(message);
+  el.innerHTML = `<div class="alert ${alertClass} mb-0 text-start${html ? " fe-procesar-status-rich" : ""}" role="alert">${contenido}</div>`;
 }
 
 async function procesarFeDesdeConsulta() {
@@ -1782,11 +1897,6 @@ async function procesarFeDesdeConsulta() {
 
   const btn = document.getElementById("btnProcesarFe");
   const prevText = btn?.textContent;
-  const archivoEsperado =
-    ultimaConsulta.xmlFileName ||
-    (esNotaCredito
-      ? null
-      : `face_${ultimaConsulta.numeroFactura}.xml`);
 
   if (btn) {
     btn.disabled = true;
@@ -1823,15 +1933,28 @@ async function procesarFeDesdeConsulta() {
       throw new Error(data.message || "No se pudo procesar el documento");
     }
 
-    const ruta = data.relativePath || data.fileName || archivoEsperado;
-    let mensaje = data.message || "Documento procesado correctamente.";
-    if (ruta) {
-      const nombre = String(ruta).replace(/^xml\//, "");
-      mensaje += `\n\nArchivo guardado en:\nxml/${nombre}`;
-    }
+    const resultadoHtml = buildFeResultadoHtml(data, {
+      esNotaCredito,
+      numeroFactura,
+      numeroNotaCredito,
+    });
+    const tituloExito = getFeResultadoTitulo(data, esNotaCredito);
 
-    setFeProcesarStatus(mensaje, "success");
-    showRespuesta(mensaje, { tipo: "success", titulo: "XML generado" });
+    setFeProcesarStatus(
+      buildFeResultadoHtml(data, {
+        esNotaCredito,
+        numeroFactura,
+        numeroNotaCredito,
+        compact: true,
+      }),
+      "success",
+      { html: true }
+    );
+    showRespuesta(resultadoHtml, {
+      tipo: "success",
+      titulo: tituloExito,
+      html: true,
+    });
   } catch (error) {
     const mensaje = error.message || "Error al procesar el documento electrónico.";
     setFeProcesarStatus(mensaje, "error");

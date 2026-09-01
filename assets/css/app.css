@@ -1012,6 +1012,181 @@ body.modo-nota-credito .field-nota-credito {
   overflow-y: auto;
 }
 
+.modal-respuesta--success .modal-header {
+  background: linear-gradient(135deg, #047857 0%, #059669 100%);
+}
+
+.modal-respuesta--error .modal-header {
+  background: linear-gradient(135deg, #b91c1c 0%, #dc2626 100%);
+}
+
+.modal-respuesta--warning .modal-header {
+  background: linear-gradient(135deg, #b45309 0%, #d97706 100%);
+}
+
+.respuesta-mensaje.respuesta-html {
+  color: inherit;
+}
+
+.fe-resultado {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.fe-resultado-hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem 1.125rem;
+  border-radius: var(--radius);
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+}
+
+.fe-resultado--xml .fe-resultado-hero {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.fe-resultado-icon {
+  flex-shrink: 0;
+  width: 3rem;
+  height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #059669;
+  color: #fff;
+}
+
+.fe-resultado--xml .fe-resultado-icon {
+  background: var(--primary);
+}
+
+.fe-resultado-hero-text {
+  min-width: 0;
+}
+
+.fe-resultado-hero-titulo {
+  margin: 0 0 0.35rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #065f46;
+  line-height: 1.35;
+}
+
+.fe-resultado--xml .fe-resultado-hero-titulo {
+  color: var(--primary-dark);
+}
+
+.fe-resultado-hero-sub {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.fe-resultado-pasos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.fe-resultado-paso {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.875rem;
+  padding: 0.875rem 1rem;
+  border-radius: calc(var(--radius) - 0.125rem);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.fe-resultado-paso-num {
+  flex-shrink: 0;
+  width: 1.75rem;
+  height: 1.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  background: #d1fae5;
+  color: #047857;
+}
+
+.fe-resultado-paso--info .fe-resultado-paso-num {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.fe-resultado-paso-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.fe-resultado-paso-titulo {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.fe-resultado-paso-detalle {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+.fe-resultado--compact {
+  gap: 0.875rem;
+}
+
+.fe-resultado--compact .fe-resultado-hero {
+  padding: 0.75rem 0.875rem;
+}
+
+.fe-resultado--compact .fe-resultado-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
+.fe-resultado--compact .fe-resultado-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.fe-resultado--compact .fe-resultado-hero-titulo {
+  font-size: 1rem;
+}
+
+.fe-resultado--compact .fe-resultado-hero-sub {
+  font-size: 0.875rem;
+}
+
+.fe-resultado--compact .fe-resultado-pasos {
+  gap: 0.5rem;
+}
+
+.fe-resultado--compact .fe-resultado-paso {
+  padding: 0.625rem 0.75rem;
+}
+
+.fe-procesar-status-rich .fe-resultado-pasos {
+  margin-top: 0.25rem;
+}
+
+.fe-procesar-status-rich .alert {
+  padding: 0.875rem 1rem;
+}
+
 .empresa-options-list {
   display: flex;
   flex-direction: column;
