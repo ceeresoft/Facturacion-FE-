@@ -451,7 +451,7 @@ INNER JOIN dbo.EmpresaV
   ON dbo.Factura.[Id EmpresaV] = dbo.EmpresaV.[Id EmpresaV]
 INNER JOIN dbo.Entidad
   ON dbo.Factura.[Documento Paciente] = dbo.Entidad.[Documento Entidad]
-INNER JOIN dbo.[Plan de Tratamiento]
+LEFT OUTER JOIN dbo.[Plan de Tratamiento]
   ON dbo.Entidad.[Documento Entidad] = dbo.[Plan de Tratamiento].[Documento Paciente]
  AND dbo.FacturaII.[Id Plan de Tratamiento] = dbo.[Plan de Tratamiento].[Id Plan de Tratamiento]
 WHERE (dbo.EmpresaV.[Id Estado] = 7)
@@ -786,4 +786,63 @@ SELECT TOP (100) PERCENT
   [Observaciones Factura] AS ObservacionesFactura
 FROM dbo.Factura
 ORDER BY IdFactura DESC
+GO
+
+------------------------------------------------------------------------------
+-- 27) Face cnsta Pais
+------------------------------------------------------------------------------
+CREATE VIEW [dbo].[Face cnsta Pais]
+AS
+SELECT
+  [Id País],
+  [Código País],
+  País,
+  [Descripción País],
+  [Orden País],
+  [Id Estado]
+FROM dbo.País
+WHERE ([Id Estado] = 7)
+GO
+
+------------------------------------------------------------------------------
+-- 28) Face cnsta Departamento
+------------------------------------------------------------------------------
+CREATE VIEW [dbo].[Face cnsta Departamento]
+AS
+SELECT
+  [Id Departamento],
+  [Código Departamento],
+  Departamento,
+  [Id País]
+FROM dbo.Departamento
+GO
+
+------------------------------------------------------------------------------
+-- 29) Face cnsta Ciudad
+------------------------------------------------------------------------------
+CREATE VIEW [dbo].[Face cnsta Ciudad]
+AS
+SELECT
+  [Id Ciudad],
+  Ciudad,
+  [Código Ciudad],
+  [Id Departamento]
+FROM dbo.Ciudad
+GO
+
+------------------------------------------------------------------------------
+-- 30) Face Cnsta TipoDocumento
+------------------------------------------------------------------------------
+CREATE VIEW [dbo].[Face Cnsta TipoDocumento]
+AS
+SELECT
+  [Id Tipo de Documento],
+  [Código Tipo de Documento],
+  [Tipo de Documento],
+  [Descripción Tipo de Documento],
+  [Orden Tipo de Documento],
+  [Id Estado],
+  codigoDian
+FROM dbo.[Tipo de Documento]
+WHERE ([Id Estado] = 7) AND (codigoDian IS NOT NULL)
 GO

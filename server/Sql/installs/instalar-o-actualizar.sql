@@ -1,21 +1,16 @@
 /*
-  instalar-o-actualizar.sql
-  Instalacion / actualizacion idempotente para Facturacion-FE.
+  installs/instalar-o-actualizar.sql
+  Instalacion idempotente completa — SQL Server 2016 SP1+ (CREATE OR ALTER VIEW).
 
-  Uso en SSMS sobre la BD del cliente (ej. CeereSio):
-    - BD NUEVA: crea tablas que falten y crea/actualiza vistas.
-    - BD con Face PHP viejo: omite tablas existentes; actualiza vistas con CREATE OR ALTER.
-
-  Requiere SQL Server 2016 SP1+ (CREATE OR ALTER VIEW).
-
-  Origen: generado desde Sql/sqlcripts.sql
-  Regenerar: node scripts/generateInstalarOActualizarSql.js
+  Generado desde Sql/sqlcripts.sql
+  Regenerar todo:  node scripts/generateInstalarOActualizarSql.js
 */
 
 SET NOCOUNT ON;
 GO
 
-PRINT N'=== Facturacion-FE: columnas requeridas ===';
+
+PRINT N'=== ALTER TABLE: columnas Facturacion-FE ===';
 GO
 
 IF COL_LENGTH('dbo.Factura', 'EstadoFacturaElectronica') IS NULL
@@ -36,9 +31,22 @@ ELSE
   PRINT N'Columna [Nota Crédito].EstadoFace ya existe.';
 GO
 
-PRINT N'';
-PRINT N'=== Facturacion-FE: TABLAS (CREATE si no existen) ===';
+IF COL_LENGTH('dbo.[Tipo de Documento]', 'codigoDian') IS NULL
+BEGIN
+  ALTER TABLE dbo.[Tipo de Documento] ADD codigoDian INT NULL;
+  PRINT N'Columna [Tipo de Documento].codigoDian creada.';
+END
+ELSE
+  PRINT N'Columna [Tipo de Documento].codigoDian ya existe.';
 GO
+
+
+PRINT N'';
+GO
+
+PRINT N'--- creates/tablas.sql ---';
+GO
+
 
 ------------------------------------------------------------------------------
 -- TABLA: Empresa
@@ -156,9 +164,13 @@ ELSE
   PRINT N'Tabla [ConfiguracionFace] ya existe — omitida.';
 GO
 
+
 PRINT N'';
-PRINT N'=== Facturacion-FE: VISTAS (CREATE OR ALTER) ===';
 GO
+
+PRINT N'--- alters/vistas-create-or-alter.sql ---';
+GO
+
 
 ------------------------------------------------------------------------------
 -- VISTA: Face Cnsta Login
@@ -371,7 +383,6 @@ GO
 
 ------------------------------------------------------------------------------
 -- VISTA: Face Cnsta FacturaE Entidad
--- Responsable de pago de la factura (Factura.[Documento Responsable]), NO el paciente.
 ------------------------------------------------------------------------------
 CREATE OR ALTER VIEW [dbo].[Face Cnsta FacturaE Entidad]
 AS
@@ -383,9 +394,6 @@ SELECT DISTINCT
   en.[Segundo Nombre Entidad] AS SegundoNombreEntidad,
   en.[Nombre Completo Entidad] AS NombreCompletoEntidad,
   e.[Dirección EntidadII] AS DireccionEntidad,
-  e.[Id Ciudad] AS IdCiudadEntidad,
-  c.[Id Departamento] AS IdDepartamentoEntidad,
-  d.[Id País] AS IdPaisEntidad,
   c.[Código Ciudad] AS CodigoCiudad,
   UPPER(c.Ciudad) AS NombreCiudadEntidad,
   d.[Código Departamento] AS CodigoDepartamentoEntidad,
@@ -431,6 +439,39 @@ LEFT OUTER JOIN dbo.[Actividad Económica] AS ae
 INNER JOIN dbo.EntidadXX AS exx
   ON ae.[Id Actividad Económica] = exx.[Id Actividad Económica]
   ON e.[Documento Entidad] = exx.[Documento Entidad]
+
+CREATE VIEW [dbo].[Face Cnsta Cuotas]
+AS
+SELECT        [Id Cuotas Pactadas Inicial Tratamiento], [Capital Faltante Cuotas Pactadas Inicial Tratamiento], [Id Plan de Tratamiento Tratamientos]
+FROM            dbo.[Cuotas Pactadas Inicial Tratamiento]
+WHERE        ([Cuota Nro Cuotas Pactadas Inicial Tratamiento] = 1)
+
+
+CREATE VIEW [dbo].[Face Cnsta SumaTotalPresupuestoSInDesAdi]
+AS
+SELECT        dbo.[Plan de Tratamiento].[Nro Plan de Tratamiento], 
+                        SUM(ROUND(dbo.[Plan de Tratamiento Items].[Valor Plan de Tratamiento Items] * dbo.[Plan de Tratamiento Items].[Cantidad Plan de Tratamiento Items] - CASE WHEN dbo.[Face Cnsta Cuotas].[Capital Faltante Cuotas Pactadas Inicial Tratamiento]
+                        > 0 THEN dbo.[Face Cnsta Cuotas].[Capital Faltante Cuotas Pactadas Inicial Tratamiento] ELSE 0 END, 0)) AS SumatoriaValores, dbo.[Plan de Tratamiento].[Id Plan de Tratamiento], 
+                        SUM((dbo.[Plan de Tratamiento Items].[Valor Plan de Tratamiento Items] - dbo.[Plan de Tratamiento Items].[Descuento $ Plan de Tratamiento Items]) 
+                        * (1 + dbo.[Plan de Tratamiento Items].[Valor Iva % Plan de Tratamiento Items]) 
+                        * dbo.[Plan de Tratamiento Items].[Cantidad Plan de Tratamiento Items] - dbo.[Plan de Tratamiento].[Descuento Adicional $ Plan de Tratamiento]) AS ValorTotalPresupuesto
+FROM            dbo.[Face Cnsta Cuotas] INNER JOIN
+                        dbo.[Plan de Tratamiento Tratamientos] ON dbo.[Face Cnsta Cuotas].[Id Plan de Tratamiento Tratamientos] = dbo.[Plan de Tratamiento Tratamientos].[Id Plan de Tratamiento Tratamientos] RIGHT OUTER JOIN
+                        dbo.[Plan de Tratamiento] INNER JOIN
+                        dbo.[Plan de Tratamiento Items] ON dbo.[Plan de Tratamiento].[Id Plan de Tratamiento] = dbo.[Plan de Tratamiento Items].[Id Plan de Tratamiento] ON 
+                        dbo.[Plan de Tratamiento Tratamientos].[Id Plan de Tratamiento] = dbo.[Plan de Tratamiento].[Id Plan de Tratamiento]
+GROUP BY dbo.[Plan de Tratamiento].[Nro Plan de Tratamiento], dbo.[Plan de Tratamiento].[Id Plan de Tratamiento]
+
+
+CREATE VIEW [dbo].[Face Cnsta GuiaCuotasNoAnticipos]
+AS
+SELECT DISTINCT 
+                        dbo.Factura.[No Factura], dbo.Factura.[Total Factura], CASE WHEN dbo.Factura.[Total Factura] = ValorTotalPresupuesto THEN 0 ELSE 1 END AS GuiaCuotasNoAnticipos, 
+                        dbo.[Face Cnsta SumaTotalPresupuestoSInDesAdi].ValorTotalPresupuesto
+FROM            dbo.[Face Cnsta SumaTotalPresupuestoSInDesAdi] INNER JOIN
+                        dbo.[Plan de Tratamiento] ON dbo.[Face Cnsta SumaTotalPresupuestoSInDesAdi].[Nro Plan de Tratamiento] = dbo.[Plan de Tratamiento].[Nro Plan de Tratamiento] INNER JOIN
+                        dbo.Factura INNER JOIN
+                        dbo.FacturaII ON dbo.Factura.[Id Factura] = dbo.FacturaII.[Id Factura] ON dbo.[Plan de Tratamiento].[Id Plan de Tratamiento] = dbo.FacturaII.[Id Plan de Tratamiento]
 GO
 
 
@@ -819,48 +860,6 @@ GO
 
 
 ------------------------------------------------------------------------------
--- DATOS: Tipo Empresa (Juridica / Natural)
-------------------------------------------------------------------------------
-IF NOT EXISTS (SELECT 1 FROM dbo.[Tipo Empresa] WHERE [Id Tipo Empresa] = 5)
-BEGIN
-  SET IDENTITY_INSERT dbo.[Tipo Empresa] ON;
-  INSERT INTO dbo.[Tipo Empresa] (
-    [Id Tipo Empresa],
-    [Código Tipo Empresa],
-    [Tipo Empresa],
-    [Descripción Tipo Empresa],
-    [Orden Tipo Empresa],
-    [Id Estado]
-  )
-  VALUES (5, 1, N'Juridica', NULL, 1, 1);
-  SET IDENTITY_INSERT dbo.[Tipo Empresa] OFF;
-  PRINT N'Registro Tipo Empresa Id=5 (Juridica) insertado.';
-END
-ELSE
-  PRINT N'Registro Tipo Empresa Id=5 ya existe — omitido.';
-GO
-
-IF NOT EXISTS (SELECT 1 FROM dbo.[Tipo Empresa] WHERE [Id Tipo Empresa] = 6)
-BEGIN
-  SET IDENTITY_INSERT dbo.[Tipo Empresa] ON;
-  INSERT INTO dbo.[Tipo Empresa] (
-    [Id Tipo Empresa],
-    [Código Tipo Empresa],
-    [Tipo Empresa],
-    [Descripción Tipo Empresa],
-    [Orden Tipo Empresa],
-    [Id Estado]
-  )
-  VALUES (6, 2, N'Natural', NULL, 1, 1);
-  SET IDENTITY_INSERT dbo.[Tipo Empresa] OFF;
-  PRINT N'Registro Tipo Empresa Id=6 (Natural) insertado.';
-END
-ELSE
-  PRINT N'Registro Tipo Empresa Id=6 ya existe — omitido.';
-GO
-
-
-------------------------------------------------------------------------------
 -- VISTA: Face cnsta Pais
 ------------------------------------------------------------------------------
 CREATE OR ALTER VIEW [dbo].[Face cnsta Pais]
@@ -923,16 +922,52 @@ WHERE ([Id Estado] = 7) AND (codigoDian IS NOT NULL)
 GO
 
 
-------------------------------------------------------------------------------
--- DATOS: Tipo de Documento (codigoDian DIAN)
-------------------------------------------------------------------------------
-IF COL_LENGTH('dbo.[Tipo de Documento]', 'codigoDian') IS NULL
+PRINT N'';
+GO
+
+PRINT N'--- updates/catalogos.sql ---';
+GO
+
+
+PRINT N'=== UPDATE / INSERT: catalogos Facturacion-FE ===';
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[Tipo Empresa] WHERE [Id Tipo Empresa] = 5)
 BEGIN
-  ALTER TABLE dbo.[Tipo de Documento] ADD codigoDian INT NULL;
-  PRINT N'Columna [Tipo de Documento].codigoDian creada.';
+  SET IDENTITY_INSERT dbo.[Tipo Empresa] ON;
+  INSERT INTO dbo.[Tipo Empresa] (
+    [Id Tipo Empresa],
+    [Código Tipo Empresa],
+    [Tipo Empresa],
+    [Descripción Tipo Empresa],
+    [Orden Tipo Empresa],
+    [Id Estado]
+  )
+  VALUES (5, 1, N'Juridica', NULL, 1, 1);
+  SET IDENTITY_INSERT dbo.[Tipo Empresa] OFF;
+  PRINT N'Registro Tipo Empresa Id=5 (Juridica) insertado.';
 END
 ELSE
-  PRINT N'Columna [Tipo de Documento].codigoDian ya existe.';
+  PRINT N'Registro Tipo Empresa Id=5 ya existe — omitido.';
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[Tipo Empresa] WHERE [Id Tipo Empresa] = 6)
+BEGIN
+  SET IDENTITY_INSERT dbo.[Tipo Empresa] ON;
+  INSERT INTO dbo.[Tipo Empresa] (
+    [Id Tipo Empresa],
+    [Código Tipo Empresa],
+    [Tipo Empresa],
+    [Descripción Tipo Empresa],
+    [Orden Tipo Empresa],
+    [Id Estado]
+  )
+  VALUES (6, 2, N'Natural', NULL, 1, 1);
+  SET IDENTITY_INSERT dbo.[Tipo Empresa] OFF;
+  PRINT N'Registro Tipo Empresa Id=6 (Natural) insertado.';
+END
+ELSE
+  PRINT N'Registro Tipo Empresa Id=6 ya existe — omitido.';
 GO
 
 UPDATE dbo.[Tipo de Documento] SET codigoDian = NULL WHERE [Id Tipo de Documento] = 1;
@@ -952,9 +987,5 @@ PRINT N'Codigos DIAN actualizados en [Tipo de Documento].';
 GO
 
 PRINT N'';
-PRINT N'=== Facturacion-FE: instalacion/actualizacion completada ===';
+PRINT N'=== Facturacion-FE: script completado ===';
 GO
-
-
-
-
