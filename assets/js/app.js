@@ -149,7 +149,7 @@ function buildFeResultadoHtml(data, { esNotaCredito, numeroFactura, numeroNotaCr
       paso: "Paso 4",
       icono: "shield",
       texto: esNotaCredito
-        ? "EstadoFace actualizado"
+        ? `Trazabilidad guardada${data?.idTrazabilidad ? ` (registro ${data.idTrazabilidad})` : ""}`
         : "EstadoFacturaElectronica actualizado",
     });
   } else if (soloXml) {
@@ -168,7 +168,11 @@ function buildFeResultadoHtml(data, { esNotaCredito, numeroFactura, numeroNotaCr
       ? `[Paso 3] Facturatech code ${data.code}, transaccionID ${data.transaccionID ?? "—"}`
       : null,
     enviado
-      ? `[Paso 4] ${esNotaCredito ? "EstadoFace" : "EstadoFacturaElectronica"} actualizado`
+      ? `[Paso 4] ${
+          esNotaCredito
+            ? `Trazabilidad guardada${data?.idTrazabilidad ? ` (Id ${data.idTrazabilidad})` : ""}`
+            : "EstadoFacturaElectronica actualizado"
+        }`
       : null,
     data?.modo ? `Modo: ${data.modo}` : null,
     data?.message ? `Mensaje servidor: ${data.message}` : null,

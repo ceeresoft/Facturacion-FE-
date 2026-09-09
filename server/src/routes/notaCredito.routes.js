@@ -95,6 +95,7 @@ router.post("/notas-credito/:numeroNota/enviar", requireAuth, async (req, res, n
       cufe: resultado.cufe,
       modo: resultado.modo,
       enviado: resultado.enviado,
+      idTrazabilidad: resultado.idTrazabilidad ?? null,
       transaccionID: resultado.envio?.transaccionID ?? null,
       code: resultado.envio?.code ?? null,
     });

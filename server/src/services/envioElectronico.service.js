@@ -10,6 +10,12 @@ import {
 import { generarXmlFactura } from "./xml/generarXmlFactura.service.js";
 import { generarXmlNotaCredito } from "./xml/generarXmlNotaCredito.service.js";
 import { ejecutarPaso, mensajePaso } from "../utils/feStepError.js";
+import {
+  marcarErrorNotaCreditoElectronica,
+  marcarNotaCreditoElectronicaEnviada,
+  marcarNotaCreditoElectronicaEnviando,
+  registrarNotaCreditoGenerada,
+} from "./notaCreditoElectronica.service.js";
 
 const DELAY_ENVIO_MS = Number.parseInt(process.env.FACTURATECH_ENVIO_DELAY_MS || "2000", 10);
 
@@ -48,8 +54,10 @@ async function marcarNotaCreditoEnviada(numeroNotaCredito) {
     `);
 
   if (!result.rowsAffected[0]) {
-    throw new FacturaError("No se pudo actualizar el estado de la nota crédito", 500);
+    return false;
   }
+
+  return true;
 }
 
 function validarRespuestaEnvio(resultado, etiqueta) {
@@ -112,7 +120,11 @@ export async function enviarFacturaElectronica(numero, idEmpresaV) {
 
   try {
     const envio = await ejecutarPaso("Paso 3: Enviar a Facturatech", () =>
-      enviarFacturaFacturatech(generado.numeroFactura, generado.xml)
+      enviarFacturaFacturatech(
+        generado.numeroFactura,
+        generado.xml,
+        idEmpresaV
+      )
     );
 
     validarRespuestaEnvio(envio, "la factura");
@@ -162,6 +174,10 @@ export async function enviarNotaCreditoElectronica(
   );
 
   const rutaXml = mensajeXmlGuardado(generado);
+  const idTrazabilidad = await ejecutarPaso(
+    "Paso 1.5: Registrar trazabilidad de nota crédito",
+    () => registrarNotaCreditoGenerada(generado, idEmpresaV)
+  );
 
   if (esSoloXmlNotaCredito()) {
     return {
@@ -182,24 +198,35 @@ export async function enviarNotaCreditoElectronica(
   await ejecutarPaso("Paso 2: Espera antes del envío", () => delay(DELAY_ENVIO_MS));
 
   try {
+    await ejecutarPaso("Paso 2.1: Reservar envío en trazabilidad", () =>
+      marcarNotaCreditoElectronicaEnviando(idTrazabilidad)
+    );
+
     const envio = await ejecutarPaso("Paso 3: Enviar a Facturatech", () =>
       enviarNotaCreditoFacturatech(
         generado.numeroNotaCredito,
         generado.prefijoNC,
-        generado.xml
+        generado.xml,
+        idEmpresaV
       )
     );
 
     validarRespuestaEnvio(envio, "la nota crédito");
 
-    await ejecutarPaso("Paso 4: Actualizar estado en BD", () =>
-      marcarNotaCreditoEnviada(generado.numeroNotaCredito)
+    await ejecutarPaso("Paso 4.1: Guardar envío en trazabilidad", () =>
+      marcarNotaCreditoElectronicaEnviada(idTrazabilidad, envio)
+    );
+
+    const estadoLegacyActualizado = await ejecutarPaso(
+      "Paso 4.2: Actualizar estado legacy en BD",
+      () => marcarNotaCreditoEnviada(generado.numeroNotaCredito)
     );
 
     return {
       ...generado,
       modo: "enviar",
       enviado: true,
+      idTrazabilidad,
       envio: {
         code: envio.code,
         transaccionID: envio.transaccionID,
@@ -208,15 +235,21 @@ export async function enviarNotaCreditoElectronica(
         "Paso 1: XML generado",
         "Paso 2: Espera completada",
         "Paso 3: Enviado a Facturatech",
-        "Paso 4: BD actualizada",
+        "Paso 4: Trazabilidad guardada",
       ],
       message:
         `${mensajePaso("Paso 1", `XML guardado en ${rutaXml}`)}\n` +
         `${mensajePaso("Paso 3", `Facturatech code ${envio.code}, transaccionID ${envio.transaccionID}`)}\n` +
-        `${mensajePaso("Paso 4", "EstadoFace actualizado")}\n\n` +
+        `${mensajePaso("Paso 4", `Trazabilidad guardada${estadoLegacyActualizado ? " y EstadoFace actualizado" : ""}`)}\n\n` +
         `La nota número ${generado.numeroNotaCredito} fue enviada correctamente.`,
     };
   } catch (error) {
+    await marcarErrorNotaCreditoElectronica(idTrazabilidad, error).catch(
+      (traceError) =>
+        console.error(
+          `[NC] No se pudo guardar el error en trazabilidad: ${traceError.message}`
+        )
+    );
     throw enriquecerErrorConXml(error, generado, "la nota crédito");
   }
 }

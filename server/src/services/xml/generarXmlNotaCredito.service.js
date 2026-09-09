@@ -44,6 +44,7 @@ export async function generarXmlNotaCredito(
     fileName,
     filePath,
     relativePath,
+    idFactura: data.factura.idFactura,
     numeroFactura: data.factura.numF,
     numeroNotaCredito: data.notaCredito.numNC,
     prefijoNC: data.notaCredito.prefijoNC,

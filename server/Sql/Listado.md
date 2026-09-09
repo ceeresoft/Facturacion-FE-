@@ -40,6 +40,7 @@ Ver también: `README.md` (estructura de carpetas y orden de ejecución)
 | `Empresa`, `EmpresaII`, `EmpresaIII` | perfil empresa |
 | `[Tipo de Documento]` | catálogo |
 | `ConfiguracionFace` | XML factura/NC |
+| `NotaCreditoElectronica` | trazabilidad e idempotencia de notas crédito enviadas |
 
 ### Vistas (30) — en `creates/vistas.sql` y `alters/`
 

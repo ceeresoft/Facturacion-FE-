@@ -352,7 +352,11 @@ export async function obtenerPdfFacturaElectronica(
   }
 
   try {
-    const pdfBuffer = await obtenerPdfFactura(factura.prefijo, factura.numero);
+    const pdfBuffer = await obtenerPdfFactura(
+      factura.prefijo,
+      factura.numero,
+      idEmpresaV
+    );
     return {
       buffer: pdfBuffer,
       fileName: `factura_${factura.prefijo}${factura.numero}.pdf`,
@@ -473,7 +477,7 @@ export async function obtenerCufeFacturaElectronica(numero, idEmpresaV) {
     throw new FacturaError("La factura no tiene prefijo configurado", 400);
   }
 
-  const cufe = await obtenerCufeFactura(prefijo, numeroLimpio);
+  const cufe = await obtenerCufeFactura(prefijo, numeroLimpio, empresaId);
   return {
     numeroFactura: numeroLimpio,
     prefijo,

@@ -10,6 +10,7 @@
 
 import fs from "fs/promises";
 import path from "path";
+import { getPool, sql } from "../config/db.js";
 import {
   resolveXmlOutputDir,
   xmlFileNameFactura,
@@ -17,7 +18,7 @@ import {
 } from "../utils/xmlPaths.js";
 import { ejecutarPaso, mensajePaso } from "../utils/feStepError.js";
 
-const WSDL_URL =
+const DEFAULT_WSDL_URL =
   process.env.FACTURATECH_WSDL_URL ||
   "https://ws.facturatech.co/v2/pro/index.php";
 
@@ -32,17 +33,70 @@ export class FacturatechError extends Error {
   }
 }
 
-function getCredentials() {
+function getEnvCredentials() {
   const username = process.env.FACTURATECH_USER;
   const password = process.env.FACTURATECH_PASSWORD;
 
-  if (!username || !password) {
-    throw new FacturatechError(
-      "FACTURATECH_USER y FACTURATECH_PASSWORD no están configurados"
-    );
+  return username && password
+    ? { username, password, wsdlUrl: DEFAULT_WSDL_URL, source: "env" }
+    : null;
+}
+
+async function getCredentials(idEmpresaV) {
+  const empresaId = Number.parseInt(idEmpresaV, 10);
+
+  if (Number.isInteger(empresaId) && empresaId > 0) {
+    try {
+      const pool = await getPool();
+      const result = await pool
+        .request()
+        .input("idEmpresaV", sql.Int, empresaId)
+        .query(`
+          SELECT TOP 1
+            c.Usuario,
+            c.Contrasena,
+            c.[URL SOAP] AS UrlSoap,
+            c.[Id Facturador] AS IdFacturador
+          FROM dbo.EmpresaV AS ev
+          INNER JOIN dbo.CredencialesWSDLFacturaTech AS c
+            ON RTRIM(c.[Documento Empresa]) = RTRIM(ev.[Documento Empresa])
+          WHERE ev.[Id EmpresaV] = @idEmpresaV
+          ORDER BY c.[Id Credenciales WSDL] DESC
+        `);
+
+      const row = result.recordset[0];
+      const username = String(row?.Usuario ?? "").trim();
+      const password = String(row?.Contrasena ?? "").trim();
+      const wsdlUrl = String(row?.UrlSoap ?? "").trim() || DEFAULT_WSDL_URL;
+
+      if (username && password) {
+        return {
+          username,
+          password,
+          wsdlUrl,
+          idFacturador: row.IdFacturador ?? null,
+          source: "database",
+        };
+      }
+    } catch (error) {
+      const envCredentials = getEnvCredentials();
+      if (envCredentials) return envCredentials;
+
+      throw new FacturatechError(
+        `No se pudieron consultar las credenciales de Facturatech para IdEmpresaV=${empresaId}: ${error.message}`,
+        { statusCode: 500 }
+      );
+    }
   }
 
-  return { username, password };
+  const envCredentials = getEnvCredentials();
+  if (envCredentials) return envCredentials;
+
+  throw new FacturatechError(
+    Number.isInteger(empresaId) && empresaId > 0
+      ? `No hay credenciales válidas en CredencialesWSDLFacturaTech para IdEmpresaV=${empresaId}`
+      : "IdEmpresaV requerido para consultar las credenciales de Facturatech"
+  );
 }
 
 function escapeXml(value) {
@@ -74,7 +128,7 @@ function parseSoapResponse(body) {
   };
 }
 
-async function soapCall(action, bodyFields) {
+async function soapCall(action, bodyFields, wsdlUrl = DEFAULT_WSDL_URL) {
   const fields = Object.entries(bodyFields)
     .map(([key, value]) => `<${key}>${escapeXml(value)}</${key}>`)
     .join("\n      ");
@@ -88,7 +142,7 @@ async function soapCall(action, bodyFields) {
   </SOAP-ENV:Body>
 </SOAP-ENV:Envelope>`;
 
-  const response = await fetch(WSDL_URL, {
+  const response = await fetch(wsdlUrl, {
     method: "POST",
     headers: {
       "Content-Type": "text/xml; charset=utf-8",
@@ -111,40 +165,68 @@ async function soapCall(action, bodyFields) {
  * Busca la factura en Facturatech y devuelve su CUFE.
  * Equivalente a EnviarNotaCredito() en wbsFactura.php.
  */
-export async function obtenerCufeFactura(prefijo, folio) {
-  const { username, password } = getCredentials();
+export async function obtenerCufeFactura(prefijo, folio, idEmpresaV) {
+  const { username, password, wsdlUrl } = await getCredentials(idEmpresaV);
+  const folioOriginal = String(folio ?? "").trim();
+  const folioSinCeros =
+    /^\d+$/.test(folioOriginal)
+      ? folioOriginal.replace(/^0+(?=\d)/, "")
+      : folioOriginal;
+  const folios = [...new Set([folioOriginal, folioSinCeros].filter(Boolean))];
+  let ultimoError = null;
 
-  const result = await soapCall("FtechAction.getCUFEFile", {
-    username,
-    password,
-    prefijo,
-    folio,
-  });
+  for (const folioCandidato of folios) {
+    try {
+      const result = await soapCall(
+        "FtechAction.getCUFEFile",
+        {
+          username,
+          password,
+          prefijo,
+          folio: folioCandidato,
+        },
+        wsdlUrl
+      );
 
-  const cufe = result.resourceData;
-  if (!cufe) {
-    throw new FacturatechError(
-      result.error || "No se obtuvo CUFE desde Facturatech",
-      result
-    );
+      if (result.resourceData) {
+        return result.resourceData;
+      }
+
+      ultimoError = new FacturatechError(
+        result.error ||
+          `No se obtuvo CUFE desde Facturatech para el folio ${folioCandidato}`,
+        result
+      );
+    } catch (error) {
+      ultimoError = error;
+    }
   }
 
-  return cufe;
+  const intentos = folios.join(" y ");
+  throw new FacturatechError(
+    `No se obtuvo CUFE consultando los folios ${intentos}. ${ultimoError?.message || ""}`.trim(),
+    {
+      code: ultimoError?.code,
+      transaccionID: ultimoError?.transaccionID,
+      raw: ultimoError?.raw,
+      statusCode: ultimoError?.statusCode,
+    }
+  );
 }
 
 /**
  * Descarga el PDF de una factura firmada en Facturatech.
  * Equivalente a downloadPDFFile del WSDL.
  */
-export async function obtenerPdfFactura(prefijo, folio) {
-  const { username, password } = getCredentials();
+export async function obtenerPdfFactura(prefijo, folio, idEmpresaV) {
+  const { username, password, wsdlUrl } = await getCredentials(idEmpresaV);
 
   const result = await soapCall("FtechAction.downloadPDFFile", {
     username,
     password,
     prefijo,
     folio,
-  });
+  }, wsdlUrl);
 
   const pdfBase64 = result.resourceData;
   if (!pdfBase64) {
@@ -161,8 +243,8 @@ export async function obtenerPdfFactura(prefijo, folio) {
  * Sube un XML a Facturatech y consulta el estado del documento.
  * Equivalente al núcleo de EnviarFactura() / EnviarFacturaNC().
  */
-export async function enviarXmlFacturatech(xmlContenido) {
-  const { username, password } = getCredentials();
+export async function enviarXmlFacturatech(xmlContenido, idEmpresaV) {
+  const { username, password, wsdlUrl } = await getCredentials(idEmpresaV);
   const xmlBase64 = Buffer.from(xmlContenido, "utf8").toString("base64");
 
   const upload = await ejecutarPaso(
@@ -172,7 +254,7 @@ export async function enviarXmlFacturatech(xmlContenido) {
         username,
         password,
         xmlBase64,
-      })
+      }, wsdlUrl)
   );
 
   if (!upload.transaccionID) {
@@ -192,7 +274,7 @@ export async function enviarXmlFacturatech(xmlContenido) {
         username,
         password,
         transaccionID: upload.transaccionID,
-      })
+      }, wsdlUrl)
   );
 
   return {
@@ -216,7 +298,11 @@ async function leerXmlDesdeArchivo(filePath) {
  * Envía factura electrónica desde face_{numero}.xml
  * Equivalente a EnviarFactura($NumeroFactura).
  */
-export async function enviarFacturaFacturatech(numeroFactura, xmlContenido) {
+export async function enviarFacturaFacturatech(
+  numeroFactura,
+  xmlContenido,
+  idEmpresaV
+) {
   let xml = xmlContenido;
 
   if (!xml) {
@@ -227,7 +313,7 @@ export async function enviarFacturaFacturatech(numeroFactura, xmlContenido) {
     xml = await leerXmlDesdeArchivo(filePath);
   }
 
-  return enviarXmlFacturatech(xml);
+  return enviarXmlFacturatech(xml, idEmpresaV);
 }
 
 /**
@@ -237,7 +323,8 @@ export async function enviarFacturaFacturatech(numeroFactura, xmlContenido) {
 export async function enviarNotaCreditoFacturatech(
   numeroNota,
   prefijoNC,
-  xmlContenido
+  xmlContenido,
+  idEmpresaV
 ) {
   let xml = xmlContenido;
 
@@ -249,7 +336,7 @@ export async function enviarNotaCreditoFacturatech(
     xml = await leerXmlDesdeArchivo(filePath);
   }
 
-  return enviarXmlFacturatech(xml);
+  return enviarXmlFacturatech(xml, idEmpresaV);
 }
 
 export function delay(ms) {

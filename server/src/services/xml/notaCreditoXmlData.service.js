@@ -128,7 +128,8 @@ export async function cargarDatosXmlNotaCredito(
       () =>
         obtenerCufeFactura(
           datosFactura.factura.prefijoF,
-          datosFactura.factura.numF
+          numeroFacturaLimpio,
+          empresaId
         )
     );
   }
