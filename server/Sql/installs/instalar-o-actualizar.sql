@@ -882,8 +882,8 @@ SELECT DISTINCT TOP (100) PERCENT
   CASE WHEN SUM(ctp.[Valor de Cuota Cuotas Pactadas Tratamiento]) IS NULL THEN 0 ELSE SUM(ctp.[Valor de Cuota Cuotas Pactadas Tratamiento]) END AS [Cobro a EPS],
   CASE WHEN SUM(cpit.[Valor de Cuota Cuotas Pactadas Inicial Tratamiento]) IS NULL THEN 0 ELSE SUM(cpit.[Valor de Cuota Cuotas Pactadas Inicial Tratamiento]) END AS Copagos,
   CASE
-    WHEN fc.[Documento Responsable] <> pl.[Documento Responsable] THEN 'SS07'
-    WHEN fc.[Documento Responsable] = pl.[Documento Responsable] THEN 'SS06'
+    WHEN RTRIM(LTRIM(REPLACE(REPLACE(fc.[Documento Responsable], CHAR(13), ''), CHAR(10), ''))) <> RTRIM(LTRIM(REPLACE(REPLACE(pl.[Documento Responsable], CHAR(13), ''), CHAR(10), ''))) THEN 'SS07'
+    WHEN RTRIM(LTRIM(REPLACE(REPLACE(fc.[Documento Responsable], CHAR(13), ''), CHAR(10), ''))) = RTRIM(LTRIM(REPLACE(REPLACE(pl.[Documento Responsable], CHAR(13), ''), CHAR(10), ''))) THEN 'SS06'
     ELSE 'SS01'
   END AS TipoFactura
 FROM dbo.[Plan de Tratamiento Tratamientos] AS pl
@@ -900,8 +900,8 @@ GROUP BY
   fc.[No Factura],
   fc.[Id EmpresaV],
   fc.[Fecha Factura],
-  fc.[Documento Responsable],
-  pl.[Documento Responsable]
+  RTRIM(LTRIM(REPLACE(REPLACE(fc.[Documento Responsable], CHAR(13), ''), CHAR(10), ''))),
+  RTRIM(LTRIM(REPLACE(REPLACE(pl.[Documento Responsable], CHAR(13), ''), CHAR(10), '')))
 GO
 
 

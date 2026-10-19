@@ -18,7 +18,7 @@
  *     NOT  → Observaciones
  *     MEP  → Medio y forma de pago
  *     ITE  → Líneas de detalle (ítems)
- *     CSL  → Sector salud (código prestador, tipo operación)
+ *     CSL  → Sector salud (SLD para SS01–SS06; USS/IDR/RAD para SS07 recaudo)
  *
  * Convención de campos: los tags (ENC_1, EMI_6, etc.) siguen el diccionario
  * del proveedor tecnológico; no se renombran para mantener compatibilidad.
@@ -128,6 +128,51 @@ function calcularMontosItem(lineaDetalle, tipoFactura) {
 }
 
 /**
+ * Tabla 46 — descripción del recaudo facturado (RFD_1 / ITE_17).
+ * 1 Copago, 2 Cuota moderadora, 3 Cuota de recuperación, 4 Pagos compartidos.
+ */
+function resolverCodigoRecaudo(lineaDetalle) {
+  const texto = `${lineaDetalle?.DescripcionItem ?? ""} ${lineaDetalle?.DescripcionFacturaII ?? ""}`.toLowerCase();
+  if (/moderador/.test(texto)) return { codigo: "2", etiqueta: "Cuota Moderadora" };
+  if (/recuperaci[oó]n/.test(texto)) return { codigo: "3", etiqueta: "Cuota de recuperación" };
+  if (/compartid|voluntari/.test(texto)) {
+    return { codigo: "4", etiqueta: "Pagos compartidos en planes voluntarios de salud" };
+  }
+  return { codigo: "1", etiqueta: "Copago" };
+}
+
+function buildCslUsuarioBeneficiario(documento, paciente) {
+  const bloqueSectorSalud = documento.ele("CSL");
+  const usuario = bloqueSectorSalud.ele("USS");
+  appendFlat(usuario, [
+    ["USS_1", paciente.documento],
+    ["USS_2", paciente.schemeId || "91"],
+    ["USS_3", `${paciente.primerNombre} ${paciente.segundoNombre}`.trim()],
+    ["USS_4", `${paciente.primerApellido} ${paciente.segundoApellido}`.trim()],
+  ]);
+
+  const identidad = usuario.ele("IDR");
+  appendFlat(identidad, [
+    ["IDR_1", paciente.documento],
+    ["IDR_2", paciente.codigoMinSalud],
+    ["IDR_3", paciente.emisorDocumento],
+    ["IDR_4", paciente.codigoPais || "CO"],
+  ]);
+
+  const residencia = usuario.ele("RAD");
+  appendFlat(residencia, [
+    ["RAD_1", paciente.codigoCiudad],
+    ["RAD_2", paciente.nombreCiudad],
+    ["RAD_3", paciente.codigoPais || "CO"],
+  ]);
+
+  if (paciente.direccion) {
+    const lineaDireccion = residencia.ele("ADL");
+    lineaDireccion.ele("ADL_1").txt(txt(paciente.direccion));
+  }
+}
+
+/**
  * Arma el XML completo de una factura electrónica.
  *
  * @param {object} datosXml - Resultado de `cargarDatosXmlFactura()`
@@ -135,6 +180,7 @@ function calcularMontosItem(lineaDetalle, tipoFactura) {
  * @param {object} datosXml.factura - Totales, fechas, prefijo y número
  * @param {object} datosXml.empresa - Datos del emisor y resolución DIAN
  * @param {object} datosXml.entidad - Responsable / adquiriente
+ * @param {object} [datosXml.paciente] - Beneficiario del servicio (USS) para SS07
  * @param {Array}  datosXml.items - Líneas de detalle
  * @param {Array}  datosXml.impuestos - Bases e IVA consolidados
  * @param {Array}  datosXml.baseImponible - Totales base imponible (TOT_3)
@@ -148,6 +194,7 @@ export function buildFacturaXml(datosXml) {
     factura,
     empresa: emisor,
     entidad: adquiriente,
+    paciente,
     items,
     impuestos,
     baseImponible,
@@ -441,8 +488,9 @@ export function buildFacturaXml(datosXml) {
   let numeroLinea = 1;
   items.forEach((lineaDetalle) => {
     const montosItem = calcularMontosItem(lineaDetalle, tipoFactura);
+    const recaudo = tipoFactura === "SS07" ? resolverCodigoRecaudo(lineaDetalle) : null;
     const nodoItem = documento.ele("ITE");
-    appendFlat(nodoItem, [
+    const camposItem = [
       ["ITE_1", numeroLinea],
       ["ITE_3", lineaDetalle.CantidadItem],
       ["ITE_4", "C62"], // Unidad de medida: unidad
@@ -452,18 +500,30 @@ export function buildFacturaXml(datosXml) {
       ["ITE_8", "COP"],
       ["ITE_10", lineaDetalle.DescripcionItem],
       ["ITE_11", lineaDetalle.DescripcionItem],
+    ];
+
+    // SS07 (SS-Recaudo): descripción contable del recaudo + código Tabla 46
+    if (recaudo) {
+      camposItem.push([
+        "ITE_12",
+        `Ingreso por determinar: ${recaudo.etiqueta.toLowerCase()} debitado como recurso a favor de terceros`,
+      ]);
+      camposItem.push(["ITE_17", recaudo.codigo]);
+    }
+
+    camposItem.push(
       ["ITE_19", montosItem.linea],
       ["ITE_20", "COP"],
       ["ITE_21", montosItem.linea],
       ["ITE_22", "COP"],
       ["ITE_27", lineaDetalle.CantidadItem],
-      ["ITE_28", "C62"],
-    ]);
+      ["ITE_28", "C62"]
+    );
+    appendFlat(nodoItem, camposItem);
 
-    // SS07: facturas de medicamentos / insumos con referencia adicional
-    if (tipoFactura === "SS07") {
+    if (recaudo) {
       const referenciaDetalle = nodoItem.ele("RFD");
-      referenciaDetalle.ele("RFD_1").txt("1");
+      referenciaDetalle.ele("RFD_1").txt(recaudo.codigo);
     }
 
     // IAE: Código del producto o servicio (estándar 999 = propio)
@@ -484,9 +544,17 @@ export function buildFacturaXml(datosXml) {
   encabezado.ele("ENC_20").txt("1");
   encabezado.ele("ENC_21").txt(tipoFactura); // Código tipo factura sector salud
 
-  // ─── CSL: Sector salud (código REPS del prestador) ───────────────────────
-  // No aplica para SS07 (medicamentos); SLD_2 y SLD_3 varían según tipoFactura.
-  if (tipoFactura !== "SS07") {
+  // ─── CSL: Sector salud ────────────────────────────────────────────────────
+  // SS07 (SS-Recaudo): USS/IDR/RAD del beneficiario (sin SLD).
+  // SS01–SS06: SLD con código prestador / modalidad / cobertura.
+  if (tipoFactura === "SS07") {
+    if (!paciente?.documento) {
+      throw new Error(
+        "SS07 requiere datos del paciente beneficiario (bloque USS) para complementar el XML"
+      );
+    }
+    buildCslUsuarioBeneficiario(documento, paciente);
+  } else {
     const bloqueSectorSalud = documento.ele("CSL");
     const datosSectorSalud = bloqueSectorSalud.ele("SLD");
     datosSectorSalud.ele("SLD_1").txt(txt(factura.codigoPrestador));
@@ -506,9 +574,6 @@ export function buildFacturaXml(datosXml) {
     }
 
     // SLD_4 y SLD_5: solo aplican para pólizas según el Ministerio de Salud; no enviar en facturación estándar.
-    // datosSectorSalud.ele("SLD_4").txt("0");
-    // datosSectorSalud.ele("SLD_5").txt("");
-
     datosSectorSalud.ele("SLD_6").txt("05");
   }
 

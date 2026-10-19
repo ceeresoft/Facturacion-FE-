@@ -113,6 +113,100 @@ function asNumber(value) {
   return Number.isNaN(n) ? 0 : n;
 }
 
+/** Mapeo código DIAN → abreviación MinSalud (Tabla 10 a / complemento salud). */
+const CODIGO_DIAN_A_MINSALUD = {
+  11: "RC",
+  12: "TI",
+  13: "CC",
+  21: "TE",
+  22: "CE",
+  41: "PA",
+  42: "CD",
+  47: "PE",
+};
+
+const EMISOR_DOCUMENTO_MINSALUD = {
+  CC: "Registraduría Nacional del Estado Civil",
+  TI: "Registraduría Nacional del Estado Civil",
+  RC: "Registraduría Nacional del Estado Civil",
+  CE: "Migración Colombia",
+  PA: "Cancillería / autoridad emisora del pasaporte",
+  PE: "Migración Colombia",
+  CD: "Ministerio de Relaciones Exteriores",
+  SC: "Migración Colombia",
+};
+
+function normalizePacienteBeneficiarioXml(row) {
+  if (!row) return null;
+
+  const tipoDocDian = asNumber(row.codigoDian ?? row.IdTipoDocumentoEntidad);
+  const documento = txt(row.DocumentoEntidad).replace(/\s+/g, "");
+  const codigoMinSalud =
+    CODIGO_DIAN_A_MINSALUD[tipoDocDian] ||
+    txt(row.AbreviaturaTipoDocumento).toUpperCase() ||
+    "SI";
+  const departE = txt(row.CodigoDepartamentoEntidad);
+  const codigoCiudad = resolverCodigoMunicipioDian(row.CodigoCiudad, departE);
+
+  return {
+    documento,
+    tipoDocDian,
+    schemeId: tipoDocDian > 0 ? String(tipoDocDian) : "91",
+    codigoMinSalud,
+    emisorDocumento:
+      EMISOR_DOCUMENTO_MINSALUD[codigoMinSalud] ||
+      "Registraduría Nacional del Estado Civil",
+    primerNombre: txt(row.PrimerNombreEntidad),
+    segundoNombre: txt(row.SegundoNombreEntidad),
+    primerApellido: txt(row.PrimerApellidoEntidad),
+    segundoApellido: txt(row.SegundoApellidoEntidad),
+    direccion: txt(row.DireccionEntidad),
+    codigoCiudad,
+    nombreCiudad: txt(row.NombreCiudadEntidad),
+    codigoPais: "CO",
+    nombrePais: txt(row.PaisEntidad) || "Colombia",
+  };
+}
+
+async function cargarPacienteBeneficiario(pool, numero, empresaId) {
+  return queryOne(
+    pool,
+    `SELECT TOP 1
+      en.[Documento Entidad] AS DocumentoEntidad,
+      en.[Primer Nombre Entidad] AS PrimerNombreEntidad,
+      en.[Segundo Nombre Entidad] AS SegundoNombreEntidad,
+      en.[Primer Apellido Entidad] AS PrimerApellidoEntidad,
+      en.[Segundo Apellido Entidad] AS SegundoApellidoEntidad,
+      e.[Dirección EntidadII] AS DireccionEntidad,
+      c.[Código Ciudad] AS CodigoCiudad,
+      UPPER(c.Ciudad) AS NombreCiudadEntidad,
+      d.[Código Departamento] AS CodigoDepartamentoEntidad,
+      td.[Id Tipo de Documento] AS IdTipoDocumentoEntidad,
+      td.codigoDian,
+      td.[Tipo de Documento] AS AbreviaturaTipoDocumento,
+      UPPER(p.[Descripción País]) AS PaisEntidad
+    FROM dbo.Factura AS f
+    INNER JOIN dbo.Entidad AS en
+      ON RTRIM(f.[Documento Paciente]) = RTRIM(en.[Documento Entidad])
+    INNER JOIN dbo.[Tipo de Documento] AS td
+      ON td.[Id Tipo de Documento] = en.[Id Tipo de Documento]
+    LEFT JOIN dbo.EntidadII AS e
+      ON en.[Documento Entidad] = e.[Documento Entidad]
+    LEFT JOIN dbo.Ciudad AS c
+      ON e.[Id Ciudad] = c.[Id Ciudad]
+    LEFT JOIN dbo.Departamento AS d
+      ON c.[Id Departamento] = d.[Id Departamento]
+    LEFT JOIN dbo.País AS p
+      ON d.[Id País] = p.[Id País]
+    WHERE RTRIM(f.[No Factura]) = RTRIM(@numero)
+      AND f.[Id EmpresaV] = @idEmpresaV`,
+    [
+      { name: "numero", type: sql.NVarChar, value: numero },
+      { name: "idEmpresaV", type: sql.Int, value: empresaId },
+    ]
+  );
+}
+
 export async function cargarDatosXmlFactura(numero, idEmpresaV) {
   const numeroLimpio = String(numero ?? "").trim();
   const empresaId = Number.parseInt(idEmpresaV, 10);
@@ -354,11 +448,28 @@ export async function cargarDatosXmlFactura(numero, idEmpresaV) {
     params
   );
 
+  let paciente = null;
+  if (tipoFactura === "SS07") {
+    const pacienteRow = await cargarPacienteBeneficiario(
+      pool,
+      numeroLimpio,
+      empresaId
+    );
+    paciente = normalizePacienteBeneficiarioXml(pacienteRow);
+    if (!paciente?.documento) {
+      throw new FacturaError(
+        "SS07 (SS-Recaudo) requiere datos del paciente en Factura.[Documento Paciente] para el bloque USS/IDR/RAD",
+        400
+      );
+    }
+  }
+
   return {
     tipoFactura,
     factura,
     empresa,
     entidad,
+    paciente,
     items,
     impuestos,
     baseImponible,
