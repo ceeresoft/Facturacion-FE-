@@ -177,15 +177,18 @@ export async function consultarFacturasPorUsuario(documentoUsuario, idEmpresaV) 
   const pool = await getPool();
   const result = await pool
     .request()
-    .input("documento", sql.NVarChar, documentoUsuario)
+    .input("documento", sql.NVarChar, String(documentoUsuario ?? "").trim())
     .input("idEmpresaV", sql.Int, idEmpresaV)
     .query(`
-      SELECT NoFactura, [Fecha Factura]
-      FROM face_facturaPorUsuario
-      WHERE [Documento Usuario] = @documento
-        AND IdEmpresaV = @idEmpresaV
-        AND EstadoFacturaElectronica IS NULL
-      ORDER BY [Fecha Factura] DESC
+      SELECT
+        RTRIM(f.[No Factura]) AS NoFactura,
+        f.[Fecha Factura]
+      FROM dbo.Factura AS f
+      WHERE RTRIM(f.[Documento Usuario]) = RTRIM(@documento)
+        AND f.[Id EmpresaV] = @idEmpresaV
+        AND f.EstadoFacturaElectronica IS NULL
+        AND f.[Id Estado] <> 5
+      ORDER BY f.[Fecha Factura] DESC
     `);
 
   return result.recordset.map((row) => ({

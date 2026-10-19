@@ -19,24 +19,54 @@ import {
 
 const DELAY_ENVIO_MS = Number.parseInt(process.env.FACTURATECH_ENVIO_DELAY_MS || "2000", 10);
 
-async function marcarFacturaEnviada(idFactura) {
+async function marcarFacturaEnviada(idFactura, numeroFactura, idEmpresaV) {
   const id = Number.parseInt(idFactura, 10);
+  const numero = String(numeroFactura ?? "").trim();
+  const empresaId = Number.parseInt(idEmpresaV, 10);
+
   if (!Number.isInteger(id) || id <= 0) {
     throw new FacturaError("IdFactura inválido para actualizar el estado", 500);
   }
 
   const pool = await getPool();
-  const result = await pool
+  const request = pool
     .request()
     .input("estado", sql.Int, 1)
-    .input("idFactura", sql.Int, id)
-    .query(`
-      UPDATE dbo.Factura
-      SET EstadoFacturaElectronica = @estado
-      WHERE [Id Factura] = @idFactura
-    `);
+    .input("idFactura", sql.Int, id);
 
-  if (!result.rowsAffected[0]) {
+  // Preferir Id Factura; si no afecta filas, fallback por número + empresa
+  // (cubre desfase de ceros a la izquierda entre UI y vista).
+  let result = await request.query(`
+    UPDATE dbo.Factura
+    SET EstadoFacturaElectronica = @estado
+    WHERE [Id Factura] = @idFactura
+  `);
+
+  const afectadas = (result.rowsAffected || []).reduce((a, n) => a + (n || 0), 0);
+  if (!afectadas && numero && Number.isInteger(empresaId) && empresaId > 0) {
+    result = await pool
+      .request()
+      .input("estado", sql.Int, 1)
+      .input("numero", sql.NVarChar, numero)
+      .input("idEmpresaV", sql.Int, empresaId)
+      .query(`
+        UPDATE dbo.Factura
+        SET EstadoFacturaElectronica = @estado
+        WHERE [Id EmpresaV] = @idEmpresaV
+          AND EstadoFacturaElectronica IS NULL
+          AND (
+            RTRIM([No Factura]) = RTRIM(@numero)
+            OR (
+              TRY_CAST(RTRIM([No Factura]) AS BIGINT) IS NOT NULL
+              AND TRY_CAST(RTRIM(@numero) AS BIGINT) IS NOT NULL
+              AND TRY_CAST(RTRIM([No Factura]) AS BIGINT) = TRY_CAST(RTRIM(@numero) AS BIGINT)
+            )
+          )
+      `);
+  }
+
+  const total = (result.rowsAffected || []).reduce((a, n) => a + (n || 0), 0);
+  if (!total) {
     throw new FacturaError("No se pudo actualizar el estado de la factura", 500);
   }
 }
@@ -130,7 +160,7 @@ export async function enviarFacturaElectronica(numero, idEmpresaV) {
     validarRespuestaEnvio(envio, "la factura");
 
     await ejecutarPaso("Paso 4: Actualizar estado en BD", () =>
-      marcarFacturaEnviada(generado.idFactura)
+      marcarFacturaEnviada(generado.idFactura, numero, idEmpresaV)
     );
 
     return {

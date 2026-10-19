@@ -1719,7 +1719,19 @@ async function cargarResoluciones() {
   }
 }
 
-async function cargarFacturasPorResolucion(idEmpresaV) {
+/** Compara números de factura ignorando ceros a la izquierda (0010098 ≈ 10098). */
+function normalizarNumeroFactura(valor) {
+  const texto = String(valor ?? "").trim();
+  if (!texto) return "";
+  const sinCeros = texto.replace(/^0+/, "");
+  return sinCeros || "0";
+}
+
+function mismosNumerosFactura(a, b) {
+  return normalizarNumeroFactura(a) === normalizarNumeroFactura(b);
+}
+
+async function cargarFacturasPorResolucion(idEmpresaV, { excluirNumero } = {}) {
   const select = document.getElementById("numeroFactura");
   if (!select) return;
 
@@ -1744,7 +1756,12 @@ async function cargarFacturasPorResolucion(idEmpresaV) {
       throw new Error(data.message || "No se pudieron cargar las facturas");
     }
 
-    if (!data.facturas?.length) {
+    const facturas = (data.facturas || []).filter((factura) => {
+      if (!excluirNumero) return true;
+      return !mismosNumerosFactura(factura.numero, excluirNumero);
+    });
+
+    if (!facturas.length) {
       select.innerHTML = esNotaCredito
         ? '<option value="" selected disabled>No hay facturas anuladas enviadas</option>'
         : '<option value="" selected disabled>No hay facturas realizadas</option>';
@@ -1754,7 +1771,7 @@ async function cargarFacturasPorResolucion(idEmpresaV) {
     select.innerHTML =
       '<option value="" selected disabled>Seleccione factura</option>';
 
-    data.facturas.forEach((factura) => {
+    facturas.forEach((factura) => {
       const option = document.createElement("option");
       option.value = factura.numero;
       option.textContent = factura.numero;
@@ -1778,15 +1795,15 @@ async function refrescarListaTrasEnvioExitoso({
   const select = document.getElementById("numeroFactura");
   if (select && numeroFactura) {
     [...select.options]
-      .filter((opt) => opt.value === String(numeroFactura))
+      .filter((opt) => mismosNumerosFactura(opt.value, numeroFactura))
       .forEach((opt) => opt.remove());
 
-    if (select.value === String(numeroFactura)) {
+    if (mismosNumerosFactura(select.value, numeroFactura)) {
       select.selectedIndex = 0;
     }
   }
 
-  await cargarFacturasPorResolucion(empresaId);
+  await cargarFacturasPorResolucion(empresaId, { excluirNumero: numeroFactura });
 
   ultimaConsulta = null;
   const resultsBody = document.getElementById("resultsBody");
@@ -2130,7 +2147,7 @@ async function procesarFeDesdeConsulta() {
       empresaId,
       numeroFactura,
       esNotaCredito,
-      enviado: data.enviado,
+      enviado: Boolean(data.enviado) || data.modo === "enviar",
     });
   } catch (error) {
     const mensaje = error.message || "Error al procesar el documento electrónico.";
