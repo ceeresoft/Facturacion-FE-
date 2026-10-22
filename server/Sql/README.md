@@ -26,8 +26,12 @@ Sql/
 | Situacion | Script |
 |-----------|--------|
 | BD Face existente, SQL Server **2016+** | `installs/instalar-o-actualizar.sql` |
-| BD Face existente, SQL Server **viejo** | `installs/actualizar-solo-alters.sql` |
+| BD Face existente, SQL Server **2008/2014** (p. ej. SQLEXPRESS2014) | `installs/actualizar-solo-alters.sql` |
 | Instalacion nueva (objetos FE no existen) | `installs/instalar-solo-creates.sql` |
+
+En **SQL 2014** no uses `CREATE OR ALTER` (`vistas-create-or-alter.sql`); usa `actualizar-solo-alters.sql` o `alters/vistas-drop-create.sql`.
+
+Los scripts son idempotentes: crean tablas/columnas solo si faltan y recrean/actualizan las 30 vistas FE (incluye `CredencialesWSDLFacturaTech` y `NotaCreditoElectronica`).
 
 ## Orden manual (pieza por pieza)
 

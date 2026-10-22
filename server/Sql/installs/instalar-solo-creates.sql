@@ -40,6 +40,43 @@ ELSE
   PRINT N'Columna [Tipo de Documento].codigoDian ya existe.';
 GO
 
+-- CredencialesWSDLFacturaTech: asegurar columnas si la tabla ya existía incompleta
+IF OBJECT_ID(N'dbo.CredencialesWSDLFacturaTech', N'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.CredencialesWSDLFacturaTech', 'Usuario') IS NULL
+  BEGIN
+    ALTER TABLE dbo.CredencialesWSDLFacturaTech ADD [Usuario] NVARCHAR(100) NULL;
+    PRINT N'Columna CredencialesWSDLFacturaTech.Usuario creada.';
+  END
+
+  IF COL_LENGTH('dbo.CredencialesWSDLFacturaTech', 'Contrasena') IS NULL
+  BEGIN
+    ALTER TABLE dbo.CredencialesWSDLFacturaTech ADD [Contrasena] NVARCHAR(100) NULL;
+    PRINT N'Columna CredencialesWSDLFacturaTech.Contrasena creada.';
+  END
+
+  IF COL_LENGTH('dbo.CredencialesWSDLFacturaTech', 'Documento Empresa') IS NULL
+  BEGIN
+    ALTER TABLE dbo.CredencialesWSDLFacturaTech ADD [Documento Empresa] NVARCHAR(50) NULL;
+    PRINT N'Columna CredencialesWSDLFacturaTech.[Documento Empresa] creada.';
+  END
+
+  IF COL_LENGTH('dbo.CredencialesWSDLFacturaTech', 'URL SOAP') IS NULL
+  BEGIN
+    ALTER TABLE dbo.CredencialesWSDLFacturaTech ADD [URL SOAP] NVARCHAR(200) NULL;
+    PRINT N'Columna CredencialesWSDLFacturaTech.[URL SOAP] creada.';
+  END
+
+  IF COL_LENGTH('dbo.CredencialesWSDLFacturaTech', 'Id Facturador') IS NULL
+  BEGIN
+    ALTER TABLE dbo.CredencialesWSDLFacturaTech ADD [Id Facturador] INT NULL;
+    PRINT N'Columna CredencialesWSDLFacturaTech.[Id Facturador] creada.';
+  END
+END
+ELSE
+  PRINT N'Tabla CredencialesWSDLFacturaTech aún no existe — se crea en creates/tablas.sql.';
+GO
+
 
 PRINT N'';
 GO
@@ -200,6 +237,28 @@ BEGIN
 END
 ELSE
   PRINT N'Tabla [NotaCreditoElectronica] ya existe — omitida.';
+GO
+
+
+------------------------------------------------------------------------------
+-- TABLA: CredencialesWSDLFacturaTech
+------------------------------------------------------------------------------
+IF OBJECT_ID(N'dbo.[CredencialesWSDLFacturaTech]', N'U') IS NULL
+BEGIN
+  -- Credenciales Facturatech por Documento Empresa (join con EmpresaV).
+  CREATE TABLE [dbo].[CredencialesWSDLFacturaTech] (
+    [Id Credenciales WSDL] INT IDENTITY(1,1) NOT NULL,
+    [Usuario] NVARCHAR(100) NULL,
+    [Contrasena] NVARCHAR(100) NULL,
+    [Documento Empresa] NVARCHAR(50) NULL,
+    [URL SOAP] NVARCHAR(200) NULL,
+    [Id Facturador] INT NULL,
+    CONSTRAINT [PK_CredencialesWSDLFacturaTech]
+      PRIMARY KEY ([Id Credenciales WSDL])
+  );
+END
+ELSE
+  PRINT N'Tabla [CredencialesWSDLFacturaTech] ya existe — omitida.';
 GO
 
 

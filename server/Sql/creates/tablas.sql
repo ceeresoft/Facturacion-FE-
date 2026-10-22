@@ -168,6 +168,28 @@ ELSE
 GO
 
 
+------------------------------------------------------------------------------
+-- TABLA: CredencialesWSDLFacturaTech
+------------------------------------------------------------------------------
+IF OBJECT_ID(N'dbo.[CredencialesWSDLFacturaTech]', N'U') IS NULL
+BEGIN
+  -- Credenciales Facturatech por Documento Empresa (join con EmpresaV).
+  CREATE TABLE [dbo].[CredencialesWSDLFacturaTech] (
+    [Id Credenciales WSDL] INT IDENTITY(1,1) NOT NULL,
+    [Usuario] NVARCHAR(100) NULL,
+    [Contrasena] NVARCHAR(100) NULL,
+    [Documento Empresa] NVARCHAR(50) NULL,
+    [URL SOAP] NVARCHAR(200) NULL,
+    [Id Facturador] INT NULL,
+    CONSTRAINT [PK_CredencialesWSDLFacturaTech]
+      PRIMARY KEY ([Id Credenciales WSDL])
+  );
+END
+ELSE
+  PRINT N'Tabla [CredencialesWSDLFacturaTech] ya existe — omitida.';
+GO
+
+
 PRINT N'';
 PRINT N'=== Facturacion-FE: script completado ===';
 GO

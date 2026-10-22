@@ -6,9 +6,16 @@
   Resumen inventario:
     - EXISTEN: 30 vistas (+ tablas FE)
     - Todas las vistas usadas por el backend y sus dependencias están incluidas.
+    - Tablas FE: Empresa*, Tipo de Documento, ConfiguracionFace,
+      NotaCreditoElectronica, CredencialesWSDLFacturaTech.
 
   NOTA: las tablas se scriptaron desde columnas + PK (sin FKs ni índices extra).
   Las vistas son la definición real del motor (OBJECT_DEFINITION).
+
+  Cómo aplicar en cliente:
+    - SQL 2016+: installs/instalar-o-actualizar.sql
+    - SQL 2008/2014: installs/actualizar-solo-alters.sql
+    Regenerar piezas: node scripts/generateInstalarOActualizarSql.js
 */
 
 ------------------------------------------------------------------------------
@@ -840,6 +847,22 @@ CREATE TABLE [dbo].[NotaCreditoElectronica] (
     UNIQUE ([IdEmpresaV], [PrefijoNotaCredito], [NumeroNotaCredito]),
   CONSTRAINT [FK_NotaCreditoElectronica_Factura]
     FOREIGN KEY ([Id Factura]) REFERENCES dbo.Factura ([Id Factura])
+);
+GO
+
+------------------------------------------------------------------------------
+-- 20c) CredencialesWSDLFacturaTech
+-- Credenciales Facturatech por Documento Empresa (join con EmpresaV).
+------------------------------------------------------------------------------
+CREATE TABLE [dbo].[CredencialesWSDLFacturaTech] (
+  [Id Credenciales WSDL] INT IDENTITY(1,1) NOT NULL,
+  [Usuario] NVARCHAR(100) NULL,
+  [Contrasena] NVARCHAR(100) NULL,
+  [Documento Empresa] NVARCHAR(50) NULL,
+  [URL SOAP] NVARCHAR(200) NULL,
+  [Id Facturador] INT NULL,
+  CONSTRAINT [PK_CredencialesWSDLFacturaTech]
+    PRIMARY KEY ([Id Credenciales WSDL])
 );
 GO
 

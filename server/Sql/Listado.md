@@ -41,10 +41,11 @@ Ver también: `README.md` (estructura de carpetas y orden de ejecución)
 | `[Tipo de Documento]` | catálogo |
 | `ConfiguracionFace` | XML factura/NC |
 | `NotaCreditoElectronica` | trazabilidad e idempotencia de notas crédito enviadas |
+| `CredencialesWSDLFacturaTech` | usuario/clave/URL SOAP Facturatech por `[Documento Empresa]` |
 
 ### Vistas (30) — en `creates/vistas.sql` y `alters/`
 
-Todas las vistas usadas por el backend están incluidas, incluyendo **`Face Cnsta FacturaParticular`**, **`Face Cnsta FacturaSaldos`**, **`Face Cnsta NumeroItems`** y **`Face Cnsta GuiaCuotaInicial`**. `[Face Cnsta Factura]` incluye **`IdFactura`**.
+Todas las vistas usadas por el backend están incluidas, incluyendo **`Face Cnsta FacturaParticular`**, **`Face Cnsta FacturaSaldos`**, **`Face Cnsta NumeroItems`** y **`Face Cnsta GuiaCuotaInicial`**. `[Face Cnsta Factura]` incluye **`IdFactura`**. **`Face Cnsta Salud Prepagada`** normaliza `Documento Responsable` (trim + CR/LF) para SS06/SS07.
 
 ### Tablas base Face (deben existir en CeereSio)
 
@@ -54,6 +55,14 @@ Todas las vistas usadas por el backend están incluidas, incluyendo **`Face Cnst
 
 ```sql
 SELECT COL_LENGTH('dbo.Factura', 'EstadoFacturaElectronica');
+SELECT OBJECT_ID(N'dbo.CredencialesWSDLFacturaTech', N'U');
+SELECT OBJECT_ID(N'dbo.NotaCreditoElectronica', N'U');
 SELECT TOP 1 IdFactura, NroFactura FROM [Face Cnsta Factura];
 SELECT COUNT(*) FROM [Face Cnsta TipoDocumento];
+-- SQL 2014: confirmar vista con limpieza CR/LF
+SELECT CASE
+  WHEN OBJECT_DEFINITION(OBJECT_ID(N'dbo.[Face Cnsta Salud Prepagada]'))
+       LIKE N'%CHAR(13)%' THEN N'OK'
+  ELSE N'Actualizar vistas (actualizar-solo-alters / drop-create)'
+END AS VistaSaludPrepagada;
 ```
